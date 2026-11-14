@@ -4,6 +4,8 @@ dist/
 /content/
 .publish/
 md2wx/target/
+md2wx/ffi/target/
+md2wx/jniLibs/
 wechat-probe-result.md
 decisions.tsv
 .env

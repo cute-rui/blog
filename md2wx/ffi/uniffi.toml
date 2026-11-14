@@ -1,0 +1,5 @@
+[bindings.kotlin]
+package_name = "uniffi.md2wx"
+cdylib_name = "md2wx_android"
+android = true
+generate_immutable_records = true
