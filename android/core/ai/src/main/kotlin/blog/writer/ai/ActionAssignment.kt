@@ -41,6 +41,8 @@ data class ActionAssignments(
     val factMaxClaims: Int = 10,
     val factPreferredDomains: String = "",
     val factCostCap: Double? = null,
+    val factUseBuiltin: Boolean = true,
+    val factSingleProfileId: String? = null,
 ) {
     fun resolveContinue(): ResolvedModel? = resolve(continueWriting, continueWriting.temperature)
 

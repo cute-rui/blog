@@ -6,6 +6,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
+internal fun JsonObject.optText(name: String): String? {
+    val element = this[name] ?: return null
+    return (element as? JsonPrimitive)?.contentOrNull
+}
+
 object JsonPath {
     fun read(root: JsonElement, path: String): JsonElement? = walk(root, tokens(path))
 

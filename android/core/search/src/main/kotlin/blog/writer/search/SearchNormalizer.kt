@@ -67,6 +67,13 @@ object SearchNormalizer {
         return SearchResponse(ordered, ignored, warnings, latencyMs)
     }
 
+    fun mergeSources(groups: List<List<SearchResult>>, preferredDomains: List<String>): List<SearchResult> {
+        val merged = dedupe(groups.flatten())
+        return floatPreferred(merged, preferredDomains).mapIndexed { index, result ->
+            result.copy(rank = index + 1)
+        }
+    }
+
     fun canonicalize(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return null
@@ -145,20 +152,19 @@ object SearchNormalizer {
             if (existing == null) {
                 kept[result.url] = result
             } else if (richness(result) > richness(existing)) {
-                kept[result.url] = result.copy(
-                    origin = result.origin.copy(
-                        alsoFrom = (existing.origin.alsoFrom + existing.origin.profileName).distinct(),
-                    ),
-                )
+                kept[result.url] = absorb(result, existing)
             } else {
-                kept[result.url] = existing.copy(
-                    origin = existing.origin.copy(
-                        alsoFrom = (existing.origin.alsoFrom + result.origin.profileName).distinct(),
-                    ),
-                )
+                kept[result.url] = absorb(existing, result)
             }
         }
         return kept.values.toList()
+    }
+
+    private fun absorb(primary: SearchResult, other: SearchResult): SearchResult {
+        val names = (primary.origin.alsoFrom + other.origin.profileName + other.origin.alsoFrom)
+            .filter { it.isNotBlank() && it != primary.origin.profileName }
+            .distinct()
+        return primary.copy(origin = primary.origin.copy(alsoFrom = names))
     }
 
     private fun richness(result: SearchResult): Int =

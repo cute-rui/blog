@@ -121,9 +121,11 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 @HiltViewModel
 class LlmHomeViewModel @Inject constructor(
     private val llm: LlmRepository,
+    search: blog.writer.data.repo.SearchRepository,
     history: blog.writer.data.repo.AiHistoryRepository,
 ) : ViewModel() {
     val profiles = llm.observeProfiles()
+    val searchProfiles = search.observe()
     val assignments = llm.observeAssignments()
     val history = history.observe()
     private val _confirmClear = MutableStateFlow(false)
@@ -148,6 +150,7 @@ fun LlmHomeScreen(
     model: LlmHomeViewModel = hiltViewModel(),
 ) {
     val profiles by model.profiles.collectAsState(emptyList())
+    val searchProfiles by model.searchProfiles.collectAsState(emptyList())
     val assignments by model.assignments.collectAsState(ActionAssignments())
     val history by model.history.collectAsState(emptyList())
     val confirm by model.confirmClear.collectAsState()
@@ -209,7 +212,44 @@ fun LlmHomeScreen(
             Text(
                 "补全中间 · ${if (assignments.fillMiddle.followDefault) "跟随默认" else assignments.fillMiddle.model ?: "未指定"} · 温度 ${assignments.fillMiddle.temperature} · ${assignments.fillTargetWords} 字",
             )
-            Text("事实核查 · ${if (assignments.factCheck.followDefault) "跟随默认" else assignments.factCheck.model ?: "未指定"} · 温度固定 0.1 · ${assignments.factMode}")
+            Text("事实核查 · ${if (assignments.factCheck.followDefault) "跟随默认" else assignments.factCheck.model ?: "未指定"} · 温度固定 0.1")
+            Text("检索", style = MaterialTheme.typography.titleSmall)
+            Text("检索方式", style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("AUTO" to "自动", "SINGLE" to "指定一个配置档", "MERGE" to "多源合并").forEach { (id, label) ->
+                    FilterChip(
+                        selected = assignments.factMode == id,
+                        onClick = { model.saveAssignments(assignments.copy(factMode = id)) },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            if (assignments.factMode == "MERGE") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("多源合并的来源数 ${assignments.factMergeCount}", modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        model.saveAssignments(assignments.copy(factMergeCount = (assignments.factMergeCount - 1).coerceAtLeast(2)))
+                    }) { Text("－") }
+                    TextButton(onClick = {
+                        model.saveAssignments(assignments.copy(factMergeCount = (assignments.factMergeCount + 1).coerceAtMost(5)))
+                    }) { Text("＋") }
+                }
+            }
+            if (assignments.factMode == "SINGLE") {
+                Text("指定一个配置档", style = MaterialTheme.typography.labelMedium)
+                if (searchProfiles.isEmpty()) {
+                    Text("还没有搜索来源。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    searchProfiles.forEach { profile ->
+                        FilterChip(
+                            selected = assignments.factSingleProfileId == profile.id,
+                            onClick = { model.saveAssignments(assignments.copy(factSingleProfileId = profile.id)) },
+                            label = { Text(profile.name) },
+                        )
+                    }
+                }
+            }
             Text("AI 历史", color = MaterialTheme.colorScheme.primary)
             if (history.isEmpty()) Text("还没有记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             history.take(8).forEach { entry ->
@@ -283,6 +323,7 @@ class LlmEditViewModel @Inject constructor(
     var savedLast4 by mutableStateOf<String?>(null)
     var stream by mutableStateOf(true)
     var jsonOutput by mutableStateOf(true)
+    var builtinSearch by mutableStateOf(false)
     var allowHttp by mutableStateOf(false)
     var contextLength by mutableStateOf(65_536)
     var maxOutput by mutableStateOf(2048)
@@ -307,6 +348,7 @@ class LlmEditViewModel @Inject constructor(
             savedLast4 = saved.keyLast4
             stream = saved.stream
             jsonOutput = saved.jsonOutput
+            builtinSearch = saved.builtinSearch
             allowHttp = saved.allowHttp
             contextLength = saved.contextLength
             maxOutput = saved.maxOutput
@@ -323,6 +365,7 @@ class LlmEditViewModel @Inject constructor(
             contextLength = preset.contextLength
             stream = preset.stream
             jsonOutput = preset.jsonOutput
+            builtinSearch = preset.builtinSearch
         }
     }
 
@@ -368,7 +411,7 @@ class LlmEditViewModel @Inject constructor(
                     maxOutput = maxOutput,
                     stream = stream,
                     jsonOutput = jsonOutput,
-                    builtinSearch = false,
+                    builtinSearch = builtinSearch && supportsBuiltinSearch(presetId, protocol),
                     connectTimeoutSec = 10,
                     firstTokenTimeoutSec = 30,
                     totalTimeoutSec = 180,
@@ -425,12 +468,23 @@ fun LlmEditScreen(onBack: () -> Unit, model: LlmEditViewModel = hiltViewModel())
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(model.modelName, { model.modelName = it }, label = { Text("模型") }, modifier = Modifier.fillMaxWidth())
+            val searchSupported = supportsBuiltinSearch(model.presetId, model.protocol)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = model.stream, onClick = { model.stream = !model.stream }, label = { Text("流式输出") })
                 FilterChip(selected = model.jsonOutput, onClick = { model.jsonOutput = !model.jsonOutput }, label = { Text("JSON 输出") })
-                FilterChip(selected = false, onClick = {}, enabled = false, label = { Text("内置联网检索") })
+                FilterChip(
+                    selected = searchSupported && model.builtinSearch,
+                    onClick = { if (searchSupported) model.builtinSearch = !model.builtinSearch },
+                    enabled = searchSupported,
+                    label = { Text("内置联网检索") },
+                )
             }
-            Text("该预设暂未适配联网检索。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                if (searchSupported) "打开后，事实核查可以把这个配置档的内置检索当作搜索来源。结果只取引用元数据。"
+                else "该预设暂未适配联网检索。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             ToggleRow("允许 http://", model.allowHttp) { model.allowHttp = it }
             if (model.allowHttp) Text("仅用于局域网自建网关，key 会以明文传输", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
             model.report?.let { Text(it) }
@@ -549,6 +603,11 @@ fun GithubScreen(onBack: () -> Unit, model: GithubViewModel = hiltViewModel()) {
 @Composable
 private fun GithubField(label: String, value: String, onChange: (String) -> Unit) {
     OutlinedTextField(value, onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth())
+}
+
+private fun supportsBuiltinSearch(presetId: String, protocol: LlmProtocol): Boolean {
+    if (LlmPresets.byId(presetId)?.builtinSearch == true) return true
+    return protocol == LlmProtocol.Anthropic || protocol == LlmProtocol.Gemini
 }
 
 private fun protocolLabel(protocol: String): String = when (protocol) {

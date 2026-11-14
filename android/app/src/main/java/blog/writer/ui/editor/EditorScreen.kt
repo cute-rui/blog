@@ -706,7 +706,13 @@ private fun ClaimCard(
                 Text("没有用来源记忆做判定。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             claim.results.forEach { result ->
+                val sources = listOf(result.origin.profileName) + result.origin.alsoFrom
                 Text("${result.rank}. ${result.title}", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    "来自 ${sources.filter { it.isNotBlank() }.joinToString("、")}" + if (result.incompleteExcerpt) " · 摘录不完整" else "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(result.url, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onCite(result.title, result.url) })
             }
             claim.fix?.let { fix ->

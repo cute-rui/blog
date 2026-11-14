@@ -81,6 +81,8 @@ data class AssignmentEntity(
     val factMaxClaims: Int = 10,
     val factPreferredDomains: String = "",
     val factCostCap: Double? = null,
+    val factUseBuiltin: Boolean = true,
+    val factSingleProfileId: String? = null,
 )
 
 @Entity(tableName = "sync_state")
@@ -135,6 +137,14 @@ data class SearchProfileEntity(
     val testSummary: String?,
     val testAtEpochMs: Long?,
     val lastTestFailed: Boolean,
+    val mcpAuth: String = "none",
+    val mcpTool: String = "",
+    val mcpParamMap: String = "",
+    val useModelCleanup: Boolean = false,
+    val cleanupProfileId: String = "",
+    val llmProfileId: String = "",
+    val boundModel: String = "",
+    val maxCitations: Int = 5,
 )
 
 @Entity(tableName = "ai_history")
@@ -271,7 +281,7 @@ interface WriterDao {
         AiHistoryEntity::class,
         FillMarkEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class WriterDatabase : RoomDatabase() {

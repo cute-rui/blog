@@ -299,7 +299,7 @@ class EditorViewModel @Inject constructor(
                     )
                 },
             )
-            val report = checker.check(matter.title, source, search.load(), factSettings(assignments))
+            val report = checker.check(matter.title, source, search.loadForFactCheck(assignments), factSettings(assignments))
             _ui.update {
                 it.copy(
                     factRunning = false,

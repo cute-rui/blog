@@ -1,5 +1,8 @@
 package blog.writer.search
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 
 fun interface ReachabilityProbe {
@@ -55,7 +58,7 @@ class SearchRouter(
         }
         return when (settings.mode) {
             SearchMode.AUTO, SearchMode.SINGLE -> walk(candidates, request, settings, spent)
-            SearchMode.MERGE -> merge(candidates.take(settings.mergeCount.coerceAtLeast(1)), request, settings, spent)
+            SearchMode.MERGE -> merge(candidates, request, settings, spent)
         }
     }
 
@@ -63,7 +66,7 @@ class SearchRouter(
         val enabled = profiles.filter { profile ->
             profile.enabled && !profile.lastTestFailed && !overDaily(profile) && !memory.isOpen(profile.id, now())
         }
-        val ordered = enabled.sortedBy { it.priority }
+        val ordered = enabled.sortedWith(compareBy<SearchProfile> { it.priority }.thenBy { it.kind.ordinal })
         return when (settings.mode) {
             SearchMode.SINGLE -> ordered.filter { it.id == settings.singleProfileId }
             SearchMode.AUTO, SearchMode.MERGE -> ordered
@@ -109,19 +112,32 @@ class SearchRouter(
         request: SearchRequest,
         settings: FactCheckSearchSettings,
         spent: Double,
-    ): RoutedSearch {
-        val pieces = mutableListOf<SearchResult>()
+    ): RoutedSearch = coroutineScope {
         val attempts = mutableListOf<SearchAttempt>()
-        var cost = spent
         val warnings = mutableListOf<String>()
         val ignored = mutableSetOf<String>()
+        var cost = spent
+        val limit = settings.mergeCount.coerceAtLeast(1)
+        val chosen = mutableListOf<SearchProfile>()
         for (profile in candidates) {
+            if (chosen.size >= limit) break
+            val price = profile.unitPrice ?: 0.0
+            if (settings.costCap != null && cost + price > settings.costCap) {
+                warnings += "已达费用上限"
+                break
+            }
             if (!reachable(profile)) {
                 attempts += SearchAttempt(profile.id, profile.name, "当前不可达")
                 continue
             }
-            val outcome = runOne(profile, request, settings)
-            cost += profile.unitPrice ?: 0.0
+            chosen += profile
+            cost += price
+        }
+        val outcomes = chosen.map { profile ->
+            async { profile to runOne(profile, request, settings) }
+        }.awaitAll()
+        val pieces = mutableListOf<SearchResult>()
+        outcomes.forEach { (profile, outcome) ->
             ignored += outcome.ignored
             warnings += outcome.warnings
             if (outcome.failure == null && outcome.results.isNotEmpty()) {
@@ -133,17 +149,8 @@ class SearchRouter(
                 attempts += SearchAttempt(profile.id, profile.name, outcome.failure ?: "0 条结果")
             }
         }
-        val merged = SearchNormalizer.normalize(
-            hits = pieces.map { result ->
-                RawHit(result.title, result.url, result.snippet, result.content, result.publishedAt?.toString(), result.siteName, result.language, result.score)
-            },
-            request = request,
-            capabilities = SearchCapabilities(freshness = true, includeDomains = true, fullContent = true),
-            origin = { rank -> pieces.getOrNull(rank - 1)?.origin ?: SearchOrigin("", "", "merge", rank) },
-            now = now(),
-            preferredDomains = settings.preferredDomains,
-        )
-        return RoutedSearch(merged.results, attempts, merged.results.isEmpty(), warnings + merged.warnings, ignored, cost)
+        val merged = SearchNormalizer.mergeSources(listOf(pieces), settings.preferredDomains)
+        RoutedSearch(merged, attempts, merged.isEmpty(), warnings, ignored, cost)
     }
 
     private suspend fun reachable(profile: SearchProfile): Boolean {

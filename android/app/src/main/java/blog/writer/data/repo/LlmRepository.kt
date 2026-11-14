@@ -169,6 +169,8 @@ private fun AssignmentEntity?.toModel(): ActionAssignments {
         factMaxClaims = row.factMaxClaims,
         factPreferredDomains = row.factPreferredDomains,
         factCostCap = row.factCostCap,
+        factUseBuiltin = row.factUseBuiltin,
+        factSingleProfileId = row.factSingleProfileId,
     )
 }
 
@@ -193,6 +195,8 @@ private fun ActionAssignments.toEntity(): AssignmentEntity = AssignmentEntity(
     factMaxClaims = factMaxClaims,
     factPreferredDomains = factPreferredDomains,
     factCostCap = factCostCap,
+    factUseBuiltin = factUseBuiltin,
+    factSingleProfileId = factSingleProfileId,
 )
 
 @Singleton

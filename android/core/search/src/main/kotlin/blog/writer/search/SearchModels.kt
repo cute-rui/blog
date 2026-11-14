@@ -5,7 +5,7 @@ import java.time.LocalDate
 
 enum class Freshness { ANY, DAY, WEEK, MONTH, YEAR }
 
-enum class SearchSourceKind { BUILTIN, CUSTOM_HTTP }
+enum class SearchSourceKind { BUILTIN, CUSTOM_HTTP, MCP, MODEL_BUILTIN }
 
 enum class SearchMode { AUTO, SINGLE, MERGE }
 
@@ -40,6 +40,7 @@ data class SearchResult(
     val language: String?,
     val score: Double?,
     val origin: SearchOrigin,
+    val incompleteExcerpt: Boolean = false,
 )
 
 data class SearchResponse(
@@ -47,6 +48,8 @@ data class SearchResponse(
     val ignoredOptions: Set<String>,
     val warnings: List<String>,
     val latencyMs: Long,
+    val detail: String? = null,
+    val rawBody: String? = null,
 )
 
 data class SearchCapabilities(

@@ -105,7 +105,7 @@ fun WriterNav(
             "search/edit/{id}",
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
         ) {
-            SearchEditScreen(onBack = { nav.popBackStack() })
+            SearchEditScreen(onBack = { nav.popBackStack() }, onOpenLlm = { nav.navigate("llm") })
         }
     }
 }
