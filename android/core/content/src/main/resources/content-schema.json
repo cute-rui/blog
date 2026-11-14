@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "title": "blog-content front matter",
+  "type": "object",
+  "required": ["title", "description", "pubDate"],
+  "properties": {
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "pubDate": { "type": "string", "format": "date" },
+    "updatedDate": { "type": "string", "format": "date" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "draft": { "type": "boolean", "default": false },
+    "heroImage": { "type": "string" },
+    "heroAlt": { "type": "string" },
+    "publish": {
+      "type": "object",
+      "properties": {
+        "blog": { "type": "boolean", "default": true },
+        "wechat": { "type": "boolean", "default": false }
+      }
+    },
+    "wechat": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 32 },
+        "author": { "type": "string", "maxLength": 16 },
+        "digest": { "type": "string", "maxLength": 120 },
+        "cover": { "type": "string" },
+        "coverCrop": { "type": "object" },
+        "openComment": { "type": "boolean" },
+        "fansOnlyComment": { "type": "boolean" },
+        "sourceUrl": { "type": "string" }
+      }
+    }
+  }
+}
