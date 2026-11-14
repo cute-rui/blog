@@ -1,0 +1,28 @@
+# 复制到内容仓库的 .github/workflows/notify.yml。不要放进博客仓库的活动 workflow。
+# 令牌来自安装在 blog 与 blog-content 上的同一个 GitHub App。
+# 权限：Contents 读和写，Actions 读。私钥放在内容仓库的 secrets.PUBLISHER_APP_KEY，
+# App ID 放在 vars.PUBLISHER_APP_ID。博客仓库同样放这两项，用来检出内容仓库。
+
+name: Notify blog
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.PUBLISHER_APP_KEY }}
+          repositories: blog
+      - env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh api repos/${{ github.repository_owner }}/blog/dispatches \
+            -f event_type=content-push \
+            -F "client_payload[before]=${{ github.event.before }}" \
+            -F "client_payload[after]=${{ github.sha }}"

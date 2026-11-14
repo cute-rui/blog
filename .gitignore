@@ -2,6 +2,9 @@ node_modules/
 dist/
 .astro/
 content/
+.publish/
+md2wx/target/
+wechat-probe-result.md
 decisions.tsv
 .env
 .env.*

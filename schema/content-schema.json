@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/blog/content-schema.json",
+  "version": 1,
+  "title": "文章 front matter",
+  "description": "博客与公众号共用的 front matter。version 变更时要同时改博客 schema、md2wx 与 App。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "description", "pubDate"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "必填。公众号标题上限 32 字；超出时必须另填 wechat.title。"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "必填。也是公众号摘要的默认值，上限 120 字。"
+    },
+    "pubDate": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updatedDate": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "draft": {
+      "type": "boolean",
+      "default": false,
+      "description": "true 时网站和公众号都不发。"
+    },
+    "heroImage": {
+      "type": "string",
+      "description": "相对文章目录的封面路径，也是公众号封面的默认值。"
+    },
+    "heroAlt": {
+      "type": "string"
+    },
+    "publish": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": { "blog": true, "wechat": false },
+      "description": "整块缺省时等价于 blog true、wechat false。",
+      "properties": {
+        "blog": {
+          "type": "boolean",
+          "default": true
+        },
+        "wechat": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否生成公众号复制页。html 与 draft 的区别由博客仓库的 WECHAT_MODE 决定，不写在文章里。"
+        }
+      }
+    },
+    "wechat": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "只在 publish.wechat 为 true 时读取。",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "author": { "type": "string", "minLength": 1, "maxLength": 16 },
+        "digest": { "type": "string", "maxLength": 120 },
+        "cover": { "type": "string" },
+        "coverCrop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x1", "y1", "x2", "y2"],
+          "properties": {
+            "x1": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y1": { "type": "number", "minimum": 0, "maximum": 1 },
+            "x2": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y2": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "openComment": { "type": "boolean" },
+        "fansOnlyComment": { "type": "boolean" },
+        "sourceUrl": {
+          "type": "string",
+          "description": "阅读原文。auto 表示本文的博客地址；publish.blog 为 false 且值为 auto 时为空。"
+        }
+      }
+    }
+  }
+}
