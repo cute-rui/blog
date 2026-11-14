@@ -67,6 +67,20 @@ data class AssignmentEntity(
     val continueProfileId: String?,
     val continueModel: String?,
     val continueTemperature: Double,
+    val fillFollow: Boolean = true,
+    val fillProfileId: String? = null,
+    val fillModel: String? = null,
+    val fillTemperature: Double = 0.7,
+    val fillTargetWords: Int = 600,
+    val factFollow: Boolean = true,
+    val factProfileId: String? = null,
+    val factModel: String? = null,
+    val factMode: String = "AUTO",
+    val factMergeCount: Int = 2,
+    val factPerClaim: Int = 5,
+    val factMaxClaims: Int = 10,
+    val factPreferredDomains: String = "",
+    val factCostCap: Double? = null,
 )
 
 @Entity(tableName = "sync_state")
@@ -90,6 +104,54 @@ data class PendingDraftEntity(
     @PrimaryKey val path: String,
     val offset: Int,
     val text: String,
+)
+
+@Entity(tableName = "search_profiles")
+data class SearchProfileEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val kind: String,
+    val service: String,
+    val baseUrl: String,
+    val enabled: Boolean,
+    val priority: Int,
+    val needsInternational: Boolean,
+    val timeoutSec: Int,
+    val dailyLimit: Int?,
+    val unitPrice: Double?,
+    val method: String,
+    val urlTemplate: String,
+    val headersText: String,
+    val bodyTemplate: String,
+    val errorPath: String,
+    val itemsPath: String,
+    val fieldsText: String,
+    val capFreshness: Boolean,
+    val capIncludeDomains: Boolean,
+    val capLanguage: Boolean,
+    val capFullContent: Boolean,
+    val keyLast4: String?,
+    val testOk: Boolean?,
+    val testSummary: String?,
+    val testAtEpochMs: Long?,
+    val lastTestFailed: Boolean,
+)
+
+@Entity(tableName = "ai_history")
+data class AiHistoryEntity(
+    @PrimaryKey val id: String,
+    val action: String,
+    val promptVersion: Int,
+    val profileId: String,
+    val model: String,
+    val createdAtEpochMs: Long,
+)
+
+@Entity(tableName = "fill_marks")
+data class FillMarkEntity(
+    @PrimaryKey val path: String,
+    val opening: String?,
+    val ending: String?,
 )
 
 @Dao
@@ -168,6 +230,33 @@ interface WriterDao {
 
     @Query("SELECT path FROM pending_drafts")
     suspend fun pendingPaths(): List<String>
+
+    @Query("SELECT * FROM search_profiles ORDER BY priority, name")
+    fun observeSearch(): Flow<List<SearchProfileEntity>>
+
+    @Query("SELECT * FROM search_profiles ORDER BY priority, name")
+    suspend fun searchProfiles(): List<SearchProfileEntity>
+
+    @Query("SELECT * FROM search_profiles WHERE id = :id")
+    suspend fun searchProfile(id: String): SearchProfileEntity?
+
+    @Upsert
+    suspend fun upsertSearch(profile: SearchProfileEntity)
+
+    @Query("DELETE FROM search_profiles WHERE id = :id")
+    suspend fun deleteSearch(id: String)
+
+    @Query("SELECT * FROM ai_history ORDER BY createdAtEpochMs DESC LIMIT 30")
+    fun observeHistory(): Flow<List<AiHistoryEntity>>
+
+    @Upsert
+    suspend fun upsertHistory(entry: AiHistoryEntity)
+
+    @Query("SELECT * FROM fill_marks WHERE path = :path")
+    suspend fun fillMarks(path: String): FillMarkEntity?
+
+    @Upsert
+    suspend fun upsertFillMarks(marks: FillMarkEntity)
 }
 
 @Database(
@@ -178,8 +267,11 @@ interface WriterDao {
         AssignmentEntity::class,
         SyncStateEntity::class,
         PendingDraftEntity::class,
+        SearchProfileEntity::class,
+        AiHistoryEntity::class,
+        FillMarkEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class WriterDatabase : RoomDatabase() {

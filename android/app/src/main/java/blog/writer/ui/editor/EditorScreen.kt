@@ -68,7 +68,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import blog.writer.ai.CheckedClaim
 import blog.writer.ai.ContinueIdea
+import blog.writer.ai.FactCheckRules
+import blog.writer.ai.Verdict
 import blog.writer.content.ContentIssue
 import blog.writer.content.IssueSeverity
 import blog.writer.data.repo.Appearance
@@ -76,6 +79,7 @@ import blog.writer.editor.MarkdownEdit
 import blog.writer.editor.MarkdownKind
 import blog.writer.editor.MarkdownSyntax
 import blog.writer.ui.theme.EditorText
+import blog.writer.ui.theme.LocalWritingColors
 import blog.writer.ui.theme.Mono
 import blog.writer.ui.theme.SerifSc
 import kotlinx.coroutines.flow.drop
@@ -101,6 +105,7 @@ fun EditorScreen(
     val haptic = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
     var ideas by remember { mutableStateOf(false) }
+    var fact by remember { mutableStateOf(false) }
     var publish by remember { mutableStateOf(false) }
     var extra by remember { mutableStateOf("") }
     val toolbar = remember {
@@ -175,7 +180,8 @@ fun EditorScreen(
                     if (ui.pending != null) {
                         ReviewBar(
                             words = ui.pending?.length ?: 0,
-                            haptics = appearance.haptics,
+                            generating = ui.fillRunning,
+                            onStop = model::stopFill,
                             onReject = {
                                 if (appearance.haptics) haptic.performHapticFeedback(HapticFeedbackType.Reject)
                                 model.reject()
@@ -228,6 +234,13 @@ fun EditorScreen(
                         .fillMaxSize()
                         .padding(horizontal = 24.dp),
                 ) {
+                    if (ui.opening != null || ui.ending != null) {
+                        Text(
+                            "开头 ${if (ui.opening != null) "已标" else "未标"} · 结尾 ${if (ui.ending != null) "已标" else "未标"}",
+                            color = MaterialTheme.colorScheme.tertiary,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                     Text(
                         "${if (ui.matter.draft) "草稿" else "文章"} · ${ui.wordCount} 字 · ${ui.savedLabel}",
                         style = MaterialTheme.typography.labelMedium,
@@ -274,18 +287,44 @@ fun EditorScreen(
                     AiMenu(
                         extra = extra,
                         onExtra = { extra = it },
+                        recommendFact = state.selection.start != state.selection.end,
+                        fillReady = ui.opening != null && ui.ending != null || state.text.contains("<!-- fill -->"),
                         onContinue = {
                             menu = false
                             ideas = true
                             model.startIdeas(state.selection.start, extra)
                         },
-                        onLater = {
-                            scope.launch { snackbar.showSnackbar("这一版还没有") }
+                        onFact = {
+                            menu = false
+                            fact = true
+                            model.startFactCheck(state.selection.start, state.selection.end)
                         },
-                        modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                        onFill = {
+                            menu = false
+                            model.startFill(extra)
+                        },
+                        onOpening = { model.markOpening(state.selection.start); menu = false },
+                        onEnding = { model.markEnding(state.selection.start); menu = false },
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
                     )
                 }
             }
+        }
+    }
+    if (fact) {
+        ModalBottomSheet(onDismissRequest = { fact = false }) {
+            FactSheet(
+                claims = ui.factClaims,
+                unmatched = ui.factUnmatched,
+                running = ui.factRunning,
+                needProfile = ui.needProfile,
+                onInsert = { fix ->
+                    model.insertFix(fix, state.selection.start)
+                    fact = false
+                },
+                onCite = { title, url -> model.appendCitation(url, title) },
+                onSettings = { fact = false; onSettings() },
+            )
         }
     }
     if (ideas) {
@@ -411,8 +450,13 @@ private fun MarkdownBar(
 private fun AiMenu(
     extra: String,
     onExtra: (String) -> Unit,
+    recommendFact: Boolean,
+    fillReady: Boolean,
     onContinue: () -> Unit,
-    onLater: () -> Unit,
+    onFact: () -> Unit,
+    onFill: () -> Unit,
+    onOpening: () -> Unit,
+    onEnding: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -426,9 +470,21 @@ private fun AiMenu(
                 Text("✦ 写作助手", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
                 Text("光标处", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            ActionRow("给我思路", "3 个方向，各附一段示范，由你挑", recommended = true, enabled = true, onClick = onContinue)
-            ActionRow("事实核查", "这一版还没有", recommended = false, enabled = false, onClick = onLater)
-            ActionRow("补全中间", "这一版还没有", recommended = false, enabled = false, onClick = onLater)
+            ActionRow("给我思路", "3 个方向，各附一段示范，由你挑", recommended = !recommendFact && !fillReady, enabled = true, onClick = onContinue)
+            ActionRow(
+                "事实核查",
+                if (recommendFact) "逐条核对陈述并附来源 · 选区" else "逐条核对陈述并附来源 · 本段",
+                recommended = recommendFact,
+                enabled = true,
+                onClick = onFact,
+            )
+            ActionRow(
+                "补全中间",
+                if (fillReady) "用你的开头和结尾补出中间" else "需先标出开头和结尾，或在空行写 <!-- fill -->",
+                recommended = fillReady,
+                enabled = fillReady,
+                onClick = { if (fillReady) onFill() else onFill() },
+            )
             OutlinedTextField(
                 value = extra,
                 onValueChange = onExtra,
@@ -436,6 +492,10 @@ private fun AiMenu(
                 placeholder = { Text("补充要求（可选）") },
                 singleLine = true,
             )
+            Row {
+                TextButton(onClick = onOpening) { Text("设为开头") }
+                TextButton(onClick = onEnding) { Text("设为结尾") }
+            }
         }
     }
 }
@@ -513,7 +573,7 @@ private fun ContinueSheet(
 }
 
 @Composable
-private fun ReviewBar(words: Int, haptics: Boolean, onReject: () -> Unit, onAccept: () -> Unit) {
+private fun ReviewBar(words: Int, generating: Boolean, onStop: () -> Unit, onReject: () -> Unit, onAccept: () -> Unit) {
     Surface(
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().height(64.dp),
         shape = RoundedCornerShape(20.dp),
@@ -521,8 +581,9 @@ private fun ReviewBar(words: Int, haptics: Boolean, onReject: () -> Unit, onAcce
         shadowElevation = 8.dp,
     ) {
         Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("$words 字", style = MaterialTheme.typography.labelMedium)
+            Text(if (generating) "生成中…" else "$words 字", style = MaterialTheme.typography.labelMedium)
             Row {
+                if (generating) TextButton(onClick = onStop) { Text("停止") }
                 TextButton(onClick = onReject) { Text("丢弃") }
                 Button(
                     onClick = onAccept,
@@ -588,6 +649,69 @@ private fun TargetCard(title: String, detail: String, selected: Boolean, isDefau
                 if (isDefault) Text("默认", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
             Text(detail, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun FactSheet(
+    claims: List<CheckedClaim>,
+    unmatched: List<CheckedClaim>,
+    running: Boolean,
+    needProfile: Boolean,
+    onInsert: (String) -> Unit,
+    onCite: (String, String) -> Unit,
+    onSettings: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = 240.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("事实核查", style = MaterialTheme.typography.titleMedium)
+        if (running) Text("正在找出可核查的陈述…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (needProfile) {
+            Text("还没有设置模型")
+            Button(onClick = onSettings) { Text("去设置") }
+        }
+        if (!running && claims.isEmpty() && unmatched.isEmpty() && !needProfile) {
+            Text("这一段没有可以核实的事实性陈述")
+        }
+        claims.forEach { claim -> ClaimCard(claim, onInsert, onCite) }
+        unmatched.forEach { claim ->
+            Text("未对上原文：${claim.claim}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun ClaimCard(
+    claim: CheckedClaim,
+    onInsert: (String) -> Unit,
+    onCite: (String, String) -> Unit,
+) {
+    val color = when (claim.verdict) {
+        Verdict.Supported -> LocalWritingColors.current.supported
+        Verdict.Wrong -> MaterialTheme.colorScheme.error
+        Verdict.Uncertain, Verdict.Unverifiable -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(claim.label, color = color, style = MaterialTheme.typography.labelLarge)
+            if (claim.claim.isNotBlank()) {
+                Text("「${claim.claim}」", style = MaterialTheme.typography.bodyMedium.copy(fontFamily = SerifSc))
+            }
+            if (claim.reason.isNotBlank()) Text(claim.reason, style = MaterialTheme.typography.bodySmall)
+            if (claim.label == FactCheckRules.RETRIEVAL_FAILED) {
+                Text("没有用来源记忆做判定。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            claim.results.forEach { result ->
+                Text("${result.rank}. ${result.title}", style = MaterialTheme.typography.labelMedium)
+                Text(result.url, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onCite(result.title, result.url) })
+            }
+            claim.fix?.let { fix ->
+                TextButton(onClick = { onInsert(fix) }) { Text("插入修正") }
+            }
         }
     }
 }

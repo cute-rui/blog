@@ -76,6 +76,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onLlm: () -> Unit,
     onGithub: () -> Unit,
+    onSearch: () -> Unit,
     model: SettingsViewModel = hiltViewModel(),
 ) {
     val appearance by model.appearanceState.collectAsState(blog.writer.data.repo.Appearance())
@@ -83,7 +84,8 @@ fun SettingsScreen(
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = onBack) { Text("返回") }
             Text("设置", style = MaterialTheme.typography.headlineSmall)
-            SettingsRow("AI 模型", "配置档、连接测试、续写用哪个模型", onLlm)
+            SettingsRow("AI 模型", "配置档、连接测试、每个动作用哪个模型", onLlm)
+            SettingsRow("搜索来源", "事实核查用的检索配置档", onSearch)
             SettingsRow("GitHub", "内容仓库、令牌、复制页清单", onGithub)
             Text("外观", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
             ToggleRow("跟随系统配色", appearance.dynamicColor) { model.update { current -> current.copy(dynamicColor = it) } }
@@ -119,9 +121,11 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
 @HiltViewModel
 class LlmHomeViewModel @Inject constructor(
     private val llm: LlmRepository,
+    history: blog.writer.data.repo.AiHistoryRepository,
 ) : ViewModel() {
     val profiles = llm.observeProfiles()
     val assignments = llm.observeAssignments()
+    val history = history.observe()
     private val _confirmClear = MutableStateFlow(false)
     val confirmClear = _confirmClear
 
@@ -145,6 +149,7 @@ fun LlmHomeScreen(
 ) {
     val profiles by model.profiles.collectAsState(emptyList())
     val assignments by model.assignments.collectAsState(ActionAssignments())
+    val history by model.history.collectAsState(emptyList())
     val confirm by model.confirmClear.collectAsState()
     if (confirm) {
         AlertDialog(
@@ -201,7 +206,31 @@ fun LlmHomeScreen(
                 },
                 valueRange = 0f..2f,
             )
-            Text("事实核查和补全中间这一版还没有。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(
+                "补全中间 · ${if (assignments.fillMiddle.followDefault) "跟随默认" else assignments.fillMiddle.model ?: "未指定"} · 温度 ${assignments.fillMiddle.temperature} · ${assignments.fillTargetWords} 字",
+            )
+            Text("事实核查 · ${if (assignments.factCheck.followDefault) "跟随默认" else assignments.factCheck.model ?: "未指定"} · 温度固定 0.1 · ${assignments.factMode}")
+            Text("AI 历史", color = MaterialTheme.colorScheme.primary)
+            if (history.isEmpty()) Text("还没有记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            history.take(8).forEach { entry ->
+                Text("${entry.action} · ${entry.model} · 模板 v${entry.promptVersion}", style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = {
+                model.saveAssignments(assignments.copy(fillMiddle = assignments.fillMiddle.copy(followDefault = !assignments.fillMiddle.followDefault)))
+            }) { Text(if (assignments.fillMiddle.followDefault) "补全中间改为指定配置档" else "补全中间改为跟随默认") }
+            TextButton(onClick = {
+                model.saveAssignments(assignments.copy(factCheck = assignments.factCheck.copy(followDefault = !assignments.factCheck.followDefault)))
+            }) { Text(if (assignments.factCheck.followDefault) "事实核查改为指定配置档" else "事实核查改为跟随默认") }
+            if (!assignments.fillMiddle.followDefault) {
+                AssignmentRow("补全中间", assignments.fillMiddle.profileId, assignments.fillMiddle.model, profiles) { id, name ->
+                    model.saveAssignments(assignments.copy(fillMiddle = assignments.fillMiddle.copy(profileId = id, model = name, followDefault = false)))
+                }
+            }
+            if (!assignments.factCheck.followDefault) {
+                AssignmentRow("事实核查", assignments.factCheck.profileId, assignments.factCheck.model, profiles) { id, name ->
+                    model.saveAssignments(assignments.copy(factCheck = assignments.factCheck.copy(profileId = id, model = name, followDefault = false)))
+                }
+            }
         }
     }
 }

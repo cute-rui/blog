@@ -23,5 +23,6 @@ include(
     ":core:render",
     ":core:sync",
     ":core:ai",
+    ":core:search",
     ":core:crypto",
 )

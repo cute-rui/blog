@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":core:render"))
     implementation(project(":core:sync"))
     implementation(project(":core:ai"))
+    implementation(project(":core:search"))
     implementation(project(":core:crypto"))
 
     implementation(platform(libs.compose.bom))

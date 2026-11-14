@@ -27,6 +27,13 @@ sdk.dir=/path/to/Android/sdk
 - LLM 配置档：计划 5.5 的预设、自定义 Base URL、连接测试、默认模型和「给我思路继续写」可以分开指定。Key 用 Android Keystore 里的 AES-GCM 密钥加密，不用 EncryptedSharedPreferences。流式调用走 OkHttp SSE。
 - 唯一可用的 AI 动作是「给我思路继续写」。生成的段落保持待审，接受前不写入 Markdown，也不参与同步。
 
+## P3
+
+- 「补全中间」：标出开头和结尾，或在正文写 `<!-- fill -->`。生成的文字先作为待审草稿。
+- 事实核查分两步：先抽出陈述，再按检索结果逐条判定。检索全部失败时标成「无法核实（检索失败）」，不会靠模型记忆下结论。
+- 搜索来源：博查、Tavily、Brave、SearXNG，以及自定义 HTTP。自动模式按优先级尝试，跳过测不通的来源。
+- AI 历史记下动作、模型和提示词模板版本。Anthropic 与 Gemini 协议在 P2 已经接上。
+
 ## 还没接上的部分
 
 - 公众号预览只调用 `WechatMarkdownRenderer`。现在的实现是 `StubWechatMarkdownRenderer`，返回固定标记，不把 Markdown 排成微信 HTML。真正的渲染要等后续把 `md2wx` 用 UniFFI 绑进来，换掉这个测试替身。

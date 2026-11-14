@@ -160,6 +160,15 @@ private fun AssignmentEntity?.toModel(): ActionAssignments {
             followDefault = row.continueFollow,
             temperature = row.continueTemperature,
         ),
+        fillMiddle = ModelChoice(row.fillProfileId, row.fillModel, row.fillFollow, row.fillTemperature),
+        fillTargetWords = row.fillTargetWords,
+        factCheck = ModelChoice(row.factProfileId, row.factModel, row.factFollow, 0.1),
+        factMode = row.factMode,
+        factMergeCount = row.factMergeCount,
+        factPerClaim = row.factPerClaim,
+        factMaxClaims = row.factMaxClaims,
+        factPreferredDomains = row.factPreferredDomains,
+        factCostCap = row.factCostCap,
     )
 }
 
@@ -170,6 +179,20 @@ private fun ActionAssignments.toEntity(): AssignmentEntity = AssignmentEntity(
     continueProfileId = continueWriting.profileId,
     continueModel = continueWriting.model,
     continueTemperature = continueWriting.temperature,
+    fillFollow = fillMiddle.followDefault,
+    fillProfileId = fillMiddle.profileId,
+    fillModel = fillMiddle.model,
+    fillTemperature = fillMiddle.temperature,
+    fillTargetWords = fillTargetWords,
+    factFollow = factCheck.followDefault,
+    factProfileId = factCheck.profileId,
+    factModel = factCheck.model,
+    factMode = factMode,
+    factMergeCount = factMergeCount,
+    factPerClaim = factPerClaim,
+    factMaxClaims = factMaxClaims,
+    factPreferredDomains = factPreferredDomains,
+    factCostCap = factCostCap,
 )
 
 @Singleton

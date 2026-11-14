@@ -20,9 +20,18 @@ import blog.writer.content.WechatHtmlLength
 import blog.writer.content.countWritingCharacters
 import blog.writer.content.narrowSelection
 import blog.writer.content.publishButtonLabel
+import blog.writer.ai.CheckedClaim
+import blog.writer.ai.FactChecker
+import blog.writer.ai.FillMiddle
+import blog.writer.ai.LlmEndpoint
+import blog.writer.ai.formatSearchResults
+import blog.writer.data.repo.AiHistoryRepository
 import blog.writer.data.repo.PostRepository
 import blog.writer.data.repo.LlmRepository
+import blog.writer.data.repo.SearchRepository
 import blog.writer.data.repo.SyncCoordinator
+import blog.writer.data.repo.factSettings
+import blog.writer.search.SearchRouter
 import blog.writer.editor.PendingDrafts
 import blog.writer.editor.PendingSpan
 import blog.writer.ui.nav.decodePath
@@ -56,6 +65,12 @@ data class EditorUi(
     val needProfile: Boolean = false,
     val message: String? = null,
     val askDraft: Boolean = false,
+    val opening: String? = null,
+    val ending: String? = null,
+    val factClaims: List<CheckedClaim> = emptyList(),
+    val factUnmatched: List<CheckedClaim> = emptyList(),
+    val factRunning: Boolean = false,
+    val fillRunning: Boolean = false,
     val checks: List<ContentIssue> = emptyList(),
     val publishLabel: String = "只保存，不发布",
 )
@@ -67,6 +82,9 @@ class EditorViewModel @Inject constructor(
     private val llm: LlmRepository,
     private val clients: LlmClients,
     private val sync: SyncCoordinator,
+    private val search: SearchRepository,
+    private val history: AiHistoryRepository,
+    private val router: SearchRouter,
 ) : ViewModel() {
     private val handle = savedStateHandle
     private var path: String = decodePath(savedStateHandle.get<String>("path").orEmpty())
@@ -75,6 +93,9 @@ class EditorViewModel @Inject constructor(
     private var matter = PostFrontMatter()
     private var saveJob: Job? = null
     private var ideaJob: Job? = null
+    private var fillJob: Job? = null
+    private var openingMark: String? = null
+    private var endingMark: String? = null
     private var undo: Pair<String, PendingSpan>? = null
 
     private val _ui = MutableStateFlow(EditorUi(path = path))
@@ -177,7 +198,127 @@ class EditorViewModel @Inject constructor(
                 }
             }
             _ui.update { it.copy(ideasLoading = false) }
+            record("continue", resolved.profileId, resolved.model)
         }
+    }
+
+    fun markOpening(cursor: Int) = mark(cursor, opening = true)
+
+    fun markEnding(cursor: Int) = mark(cursor, opening = false)
+
+    fun clearMarks() {
+        openingMark = null
+        endingMark = null
+        viewModelScope.launch { history.saveMarks(path, null, null) }
+        publishUi()
+    }
+
+    fun startFill(extra: String) {
+        if (pending != null) {
+            publishUi(askDraft = true)
+            return
+        }
+        val target = FillMiddle.target(display, openingMark, endingMark)
+        if (target == null) {
+            publishUi(message = "需先标出开头和结尾，或在空行写 <!-- fill -->")
+            return
+        }
+        fillJob?.cancel()
+        fillJob = viewModelScope.launch {
+            val resolved = llm.observeAssignments().first().resolveFill()
+            val endpoint = resolved?.let { llm.endpoint(it.profileId, it.model) }
+            if (resolved == null || endpoint == null) {
+                _ui.update { it.copy(needProfile = true, fillRunning = false) }
+                return@launch
+            }
+            val words = llm.observeAssignments().first().fillTargetWords
+            val opening = display.substring(target.opening.start, target.opening.endExclusive)
+            val ending = display.substring(target.ending.start, target.ending.endExclusive)
+            val context = assembleContext(matter.title, matter.description, matter.tags, display, target.insertAt)
+            val (seed, span) = PendingDrafts.insert(display, target.insertAt, "\n\n")
+            display = seed
+            pending = span
+            _commands.tryEmit(TextCommand(seed, span.endExclusive))
+            _ui.update { it.copy(fillRunning = true, ideasError = null) }
+            val request = LlmRequest(
+                model = endpoint.model,
+                system = Prompts.system,
+                user = Prompts.fillUser(context.meta, context.outline, opening, ending, words, extra),
+                temperature = resolved.temperature,
+                maxOutputTokens = llm.profile(resolved.profileId)?.maxOutput ?: 2048,
+                stream = endpoint.stream,
+                jsonObject = false,
+            )
+            streamIntoPending(endpoint, request)
+            _ui.update { it.copy(fillRunning = false) }
+            record("fill", resolved.profileId, resolved.model)
+        }
+    }
+
+    fun stopFill() {
+        fillJob?.cancel()
+        _ui.update { it.copy(fillRunning = false) }
+    }
+
+    fun startFactCheck(selectionStart: Int, selectionEnd: Int) {
+        if (pending != null) {
+            publishUi(askDraft = true)
+            return
+        }
+        viewModelScope.launch {
+            val resolved = llm.observeAssignments().first().resolveFactCheck()
+            val endpoint = resolved?.let { llm.endpoint(it.profileId, it.model) }
+            if (resolved == null || endpoint == null) {
+                _ui.update { it.copy(needProfile = true, factRunning = false) }
+                return@launch
+            }
+            val source = if (selectionStart == selectionEnd) {
+                FillMiddle.paragraphAt(display, selectionStart)
+            } else {
+                display.substring(selectionStart.coerceAtMost(selectionEnd), selectionEnd.coerceAtLeast(selectionStart))
+            }
+            _ui.update { it.copy(factRunning = true, factClaims = emptyList(), factUnmatched = emptyList()) }
+            val assignments = llm.observeAssignments().first()
+            val checker = FactChecker(
+                router = router,
+                extract = { title, text ->
+                    complete(endpoint, LlmRequest(endpoint.model, Prompts.system, Prompts.extractClaims(title, text, endpoint.jsonOutput), 0.1, 1024, endpoint.stream, false))
+                },
+                judge = { claim, results ->
+                    complete(
+                        endpoint,
+                        LlmRequest(
+                            endpoint.model,
+                            Prompts.system,
+                            Prompts.judgeClaim(claim, formatSearchResults(results), endpoint.jsonOutput),
+                            0.1,
+                            512,
+                            endpoint.stream,
+                            false,
+                        ),
+                    )
+                },
+            )
+            val report = checker.check(matter.title, source, search.load(), factSettings(assignments))
+            _ui.update {
+                it.copy(
+                    factRunning = false,
+                    factClaims = report.checked,
+                    factUnmatched = report.unmatched,
+                )
+            }
+            record("fact-check", resolved.profileId, resolved.model)
+        }
+    }
+
+    fun insertFix(fix: String, cursor: Int) = insertSample(fix, cursor)
+
+    fun appendCitation(url: String, title: String) {
+        val footnote = "\n\n[${title}]($url)\n"
+        val text = display + footnote
+        display = text
+        _commands.tryEmit(TextCommand(text, text.length))
+        scheduleSave()
     }
 
     fun stopIdeas() {
@@ -250,6 +391,9 @@ class EditorViewModel @Inject constructor(
             display = document.body
             pending = null
         }
+        val marks = history.marks(path)
+        openingMark = marks?.opening
+        endingMark = marks?.ending
         publishUi(loaded = true, savedLabel = "已打开")
         _commands.tryEmit(TextCommand(display, display.length))
     }
@@ -289,7 +433,52 @@ class EditorViewModel @Inject constructor(
                 savedLabel = savedLabel,
                 message = message,
                 askDraft = askDraft,
+                opening = openingMark,
+                ending = endingMark,
             )
         }
+    }
+
+    private fun mark(cursor: Int, opening: Boolean) {
+        val paragraph = FillMiddle.paragraphAt(display, cursor)
+        if (paragraph.isBlank()) return
+        if (opening) openingMark = paragraph else endingMark = paragraph
+        viewModelScope.launch { history.saveMarks(path, openingMark, endingMark) }
+        publishUi()
+    }
+
+    private suspend fun streamIntoPending(endpoint: LlmEndpoint, request: LlmRequest) {
+        clients.create(endpoint).stream(request).collect { event ->
+            when (event) {
+                is LlmEvent.TextDelta -> appendPending(event.text)
+                is LlmEvent.Failed -> _ui.update { it.copy(ideasError = event.error.message) }
+                is LlmEvent.Done, is LlmEvent.Citation -> Unit
+            }
+        }
+    }
+
+    private fun appendPending(delta: String) {
+        val span = pending ?: return
+        if (delta.isEmpty() || span.endExclusive > display.length) return
+        display = display.substring(0, span.endExclusive) + delta + display.substring(span.endExclusive)
+        pending = span.copy(endExclusive = span.endExclusive + delta.length)
+        _commands.tryEmit(TextCommand(display, pending?.endExclusive ?: display.length))
+        publishUi()
+    }
+
+    private suspend fun complete(endpoint: LlmEndpoint, request: LlmRequest): String {
+        val text = StringBuilder()
+        clients.create(endpoint).stream(request).collect { event ->
+            when (event) {
+                is LlmEvent.TextDelta -> text.append(event.text)
+                is LlmEvent.Failed -> error(event.error.message)
+                is LlmEvent.Done, is LlmEvent.Citation -> Unit
+            }
+        }
+        return text.toString()
+    }
+
+    private suspend fun record(action: String, profileId: String, model: String) {
+        history.record(action, profileId, model)
     }
 }

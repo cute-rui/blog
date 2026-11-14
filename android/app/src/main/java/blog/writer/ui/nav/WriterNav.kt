@@ -18,6 +18,8 @@ import blog.writer.ui.settings.GithubScreen
 import blog.writer.ui.settings.LlmEditScreen
 import blog.writer.ui.settings.LlmHomeScreen
 import blog.writer.ui.settings.SettingsScreen
+import blog.writer.ui.search.SearchEditScreen
+import blog.writer.ui.search.SearchListScreen
 
 fun encodePath(path: String): String =
     Base64.encodeToString(path.toByteArray(), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
@@ -34,7 +36,7 @@ fun WriterNav(
     LaunchedEffect(nav) {
         nav.currentBackStackEntryFlow.collect { entry ->
             val route = entry.destination.route.orEmpty()
-            onSecureScreen(route.startsWith("llm") || route.startsWith("github"))
+            onSecureScreen(route.startsWith("llm") || route.startsWith("github") || route.startsWith("search"))
         }
     }
     NavHost(navController = nav, startDestination = "posts") {
@@ -73,6 +75,7 @@ fun WriterNav(
                 onBack = { nav.popBackStack() },
                 onLlm = { nav.navigate("llm") },
                 onGithub = { nav.navigate("github") },
+                onSearch = { nav.navigate("search") },
             )
         }
         composable("llm") {
@@ -90,6 +93,19 @@ fun WriterNav(
         }
         composable("github") {
             GithubScreen(onBack = { nav.popBackStack() })
+        }
+        composable("search") {
+            SearchListScreen(
+                onBack = { nav.popBackStack() },
+                onEdit = { id -> nav.navigate("search/edit/${Uri.encode(id)}") },
+                onCreate = { kind -> nav.navigate("search/edit/new-$kind") },
+            )
+        }
+        composable(
+            "search/edit/{id}",
+            arguments = listOf(navArgument("id") { type = NavType.StringType }),
+        ) {
+            SearchEditScreen(onBack = { nav.popBackStack() })
         }
     }
 }

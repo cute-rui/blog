@@ -1,5 +1,16 @@
 package blog.writer.ai
 
+import blog.writer.search.FactCheckSearchSettings
+import blog.writer.search.SearchAdapter
+import blog.writer.search.SearchCapabilities
+import blog.writer.search.SearchException
+import blog.writer.search.SearchProfile
+import blog.writer.search.SearchRequest
+import blog.writer.search.SearchResponse
+import blog.writer.search.SearchResult
+import blog.writer.search.SearchOrigin
+import blog.writer.search.SearchRouter
+import blog.writer.search.SearchSourceKind
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -49,7 +60,7 @@ class AiTest {
         val parser = IdeaStreamParser()
         assertEquals("甲", parser.push("""[{"direction":"甲","sample":"第一段"}""").single().direction)
         assertTrue(parser.push(""" ,{"direction":"乙","sample":"第二段"}]""").single().direction == "乙")
-        assertEquals(1, Prompts.version)
+        assertEquals(2, Prompts.version)
         assertTrue(Prompts.system.contains("Lightwing"))
         val prompt = Prompts.continueUser("标题", "大纲", "前", "后", "更具体", jsonMode = false)
         assertTrue(prompt.contains("不要用代码块包裹"))
@@ -236,4 +247,77 @@ class AiTest {
         assertEquals("乙", (gemini as LlmEvent.TextDelta).text)
         assertEquals("gemini-2.5-flash", box.model)
     }
+
+    @Test
+    fun supportedWithoutSourcesIsDowngraded() {
+        val sanitized = FactCheckRules.sanitize(
+            claim = "Kotlin 2.0 在 2024 年发布",
+            raw = RawJudgement("属实", "看起来对", emptyList(), null),
+            sourceText = "Kotlin 2.0 在 2024 年发布。",
+            resultCount = 2,
+        )
+        assertEquals(Verdict.Unverifiable, sanitized.verdict)
+        val kept = FactCheckRules.sanitize(
+            claim = "Kotlin 2.0 在 2024 年发布",
+            raw = RawJudgement("错误", "年份不对", listOf(1, 9), "Kotlin 2.0 在 2024 年 5 月发布"),
+            sourceText = "Kotlin 2.0 在 2024 年发布。",
+            resultCount = 1,
+        )
+        assertEquals(listOf(1), kept.sourceIndexes)
+        assertEquals(Verdict.Wrong, kept.verdict)
+    }
+
+    @Test
+    fun failedSearchDoesNotAskTheModelToJudge() = runBlocking {
+        var judged = false
+        val checker = FactChecker(
+            router = SearchRouter(),
+            extract = { _, _ -> """[{"claim":"Kotlin 2.0 在 2024 年发布","query":"Kotlin 2.0"}]""" },
+            judge = { _, _ ->
+                judged = true
+                """{"verdict":"属实","reason":"记忆","sources":[]}"""
+            },
+        )
+        val report = checker.check(
+            title = "题",
+            text = "Kotlin 2.0 在 2024 年发布。",
+            profiles = listOf(brokenProfile()),
+            settings = FactCheckSearchSettings(),
+        )
+        assertFalse(judged)
+        assertEquals(FactCheckRules.RETRIEVAL_FAILED, report.checked.single().label)
+        assertTrue(report.checked.single().reason.contains("博查"))
+    }
+
+    @Test
+    fun fillMarkerAndHistoryUseThePromptVersion() {
+        val body = "开头段说明背景。\n\n<!-- fill -->\n\n结尾段给出结论。"
+        val target = FillMiddle.target(body, null, null)
+        assertEquals(body.indexOf("<!-- fill -->"), target?.insertAt)
+        assertTrue(target!!.opening.endExclusive <= target.insertAt)
+        val marked = FillMiddle.target("前文。开头段。后文。结尾段。", "开头段。", "结尾段。")
+        assertEquals("开头段。".length + "前文。".length, marked?.insertAt)
+        val entry = historyEntry("fact-check", "deepseek", "deepseek-chat", 1L)
+        assertEquals(Prompts.version, entry.promptVersion)
+        assertTrue(Prompts.fillUser("题", "纲", "开", "结", 600, null).contains("约 600 字"))
+    }
+
+    private fun brokenProfile() = SearchProfile(
+        id = "bocha",
+        name = "博查",
+        kind = SearchSourceKind.BUILTIN,
+        host = "api.bochaai.com",
+        enabled = true,
+        priority = 0,
+        needsInternationalNetwork = false,
+        lastTestFailed = false,
+        dailyLimit = null,
+        dailyUsed = 0,
+        unitPrice = null,
+        adapter = object : SearchAdapter {
+            override val id = "bocha"
+            override val capabilities = SearchCapabilities()
+            override suspend fun search(request: SearchRequest): SearchResponse = throw SearchException("超时")
+        },
+    )
 }

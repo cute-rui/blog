@@ -9,6 +9,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core:editor"))
+    implementation(project(":core:search"))
     implementation(libs.serialization.json)
     implementation(libs.coroutines.core)
     implementation(libs.okhttp)
