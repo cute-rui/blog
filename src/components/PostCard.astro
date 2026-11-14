@@ -1,0 +1,82 @@
+---
+import { readingTime } from '../lib/reading-time';
+import { postUrl, type Post } from '../lib/posts';
+import FormattedDate from './FormattedDate.astro';
+import PostCover from './PostCover.astro';
+import Tag from './Tag.astro';
+
+type Props = {
+  post: Post;
+  variant?: 'row' | 'featured';
+};
+
+const { post, variant = 'row' } = Astro.props;
+const { minutes } = readingTime(post.body);
+const url = postUrl(post);
+const featured = variant === 'featured';
+---
+
+<article
+  class:list={[
+    'group relative border border-line bg-surface shadow-card transition duration-300 ease-out',
+    'hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-card-hover',
+    featured
+      ? 'overflow-hidden rounded-3xl'
+      : 'grid gap-4 rounded-2xl p-3 sm:grid-cols-[12.5rem_minmax(0,1fr)] sm:gap-6 sm:p-4',
+  ]}
+>
+  <div
+    class:list={[
+      'overflow-hidden bg-accent-soft',
+      featured ? 'aspect-[2/1]' : 'aspect-[16/10] rounded-xl',
+    ]}
+  >
+    <PostCover
+      post={post}
+      width={featured ? 1440 : 800}
+      height={featured ? 720 : 500}
+      sizes={featured ? '(min-width: 1024px) 720px, 100vw' : '(min-width: 640px) 200px, 100vw'}
+      priority={featured}
+      class="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+    />
+  </div>
+  <div class:list={['min-w-0', featured ? 'p-5 sm:p-7' : 'py-1 sm:py-1.5']}>
+    <p class="kicker flex flex-wrap items-center gap-x-2">
+      {featured && <span class="text-accent">最新</span>}
+      {featured && <span aria-hidden="true">·</span>}
+      <FormattedDate date={post.data.pubDate} />
+      <span aria-hidden="true">·</span>
+      <span>{minutes} 分钟</span>
+    </p>
+    <h2
+      class:list={[
+        'mt-2 font-serif font-semibold tracking-tight text-balance',
+        featured ? 'text-2xl leading-tight sm:text-3xl' : 'text-xl leading-snug',
+      ]}
+    >
+      <a
+        href={url}
+        class="transition-colors after:absolute after:inset-0 after:rounded-[inherit] group-hover:text-accent"
+      >
+        {post.data.title}
+      </a>
+    </h2>
+    <p
+      class:list={[
+        'mt-2 leading-relaxed text-muted',
+        featured ? 'text-base sm:text-[1.05rem]' : 'line-clamp-2 text-[0.95rem]',
+      ]}
+    >
+      {post.data.description}
+    </p>
+    {
+      post.data.tags.length > 0 && (
+        <div class="relative z-10 mt-3 flex flex-wrap gap-1.5">
+          {post.data.tags.map((tag) => (
+            <Tag tag={tag} />
+          ))}
+        </div>
+      )
+    }
+  </div>
+</article>

@@ -1,0 +1,135 @@
+---
+import { siteConfig } from '../site.config';
+import { countTags, groupByYear, type Post } from '../lib/posts';
+import { readingTime } from '../lib/reading-time';
+import { formatWords } from '../lib/format';
+import Seal from './Seal.astro';
+import Tag from './Tag.astro';
+
+type Props = {
+  posts: Post[];
+};
+
+const { posts } = Astro.props;
+const tags = countTags(posts);
+const years = groupByYear(posts);
+const words = formatWords(posts.reduce((sum, post) => sum + readingTime(post.body).words, 0));
+const latest = posts[0];
+
+function isExternal(href: string): boolean {
+  return href.startsWith('https://') || href.startsWith('http://');
+}
+---
+
+<aside class="space-y-10 lg:sticky lg:top-24 lg:self-start" aria-label="侧栏">
+  <section class="rounded-2xl border border-line bg-surface p-5 shadow-card">
+    <div class="flex items-center gap-4">
+      <Seal size={52} />
+      <div class="min-w-0">
+        <p class="font-serif text-lg font-semibold leading-tight">{siteConfig.author}</p>
+        <p class="kicker mt-1 truncate">{siteConfig.title}</p>
+      </div>
+    </div>
+    <p class="mt-4 text-sm leading-relaxed text-muted">{siteConfig.bio}</p>
+    <dl class="mt-5 flex items-end justify-between gap-4 border-t border-line-soft pt-4">
+      <div>
+        <dt class="kicker">文章</dt>
+        <dd class="mt-1 font-serif text-2xl leading-none tabular-nums">{posts.length}</dd>
+      </div>
+      <div>
+        <dt class="kicker">标签</dt>
+        <dd class="mt-1 font-serif text-2xl leading-none tabular-nums">{tags.length}</dd>
+      </div>
+      <div>
+        <dt class="kicker">字数</dt>
+        <dd class="mt-1 font-serif text-2xl leading-none tabular-nums">
+          {words.value}<span class="ml-0.5 font-sans text-xs text-muted">{words.unit}</span>
+        </dd>
+      </div>
+    </dl>
+    {
+      siteConfig.social.length > 0 && (
+        <ul class="mt-5 flex flex-wrap gap-x-4 gap-y-1">
+          {siteConfig.social.map(({ label, href }) => (
+            <li>
+              <a
+                href={href}
+                class="kicker inline-flex items-center gap-1 transition-colors hover:text-accent"
+                rel={isExternal(href) ? 'noopener' : undefined}
+                target={isExternal(href) ? '_blank' : undefined}
+              >
+                {label}
+                <span aria-hidden="true">{isExternal(href) ? '↗' : '→'}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  {
+    tags.length > 0 && (
+      <section>
+        <h2 class="kicker flex items-center gap-3">
+          标签
+          <span class="h-px flex-1 bg-line" aria-hidden="true" />
+          <a href="/tags/" class="transition-colors hover:text-accent">
+            全部 →
+          </a>
+        </h2>
+        <div class="mt-4 flex flex-wrap gap-2">
+          {tags.slice(0, 12).map(({ tag, count }) => (
+            <Tag tag={tag} count={count} />
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    years.length > 0 && (
+      <section>
+        <h2 class="kicker flex items-center gap-3">
+          归档
+          <span class="h-px flex-1 bg-line" aria-hidden="true" />
+          <a href="/archive/" class="transition-colors hover:text-accent">
+            全部 →
+          </a>
+        </h2>
+        <ol class="mt-3">
+          {years.map(({ year, posts: yearPosts }) => (
+            <li>
+              <a
+                href={`/archive/#y-${year}`}
+                class="group flex items-baseline gap-2 py-1.5 text-sm transition-colors hover:text-accent"
+              >
+                <span class="font-serif text-base tabular-nums">{year}</span>
+                <span
+                  class="mb-1 flex-1 border-b border-dotted border-line transition-colors group-hover:border-accent"
+                  aria-hidden="true"
+                />
+                <span class="kicker group-hover:text-accent">{yearPosts.length} 篇</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </section>
+    )
+  }
+
+  <section class="rounded-2xl border border-dashed border-line p-4">
+    <p class="kicker">订阅</p>
+    <p class="mt-2 text-sm leading-relaxed text-muted">
+      {latest ? `最近更新于 ${latest.data.pubDate.getUTCFullYear()} 年 ${latest.data.pubDate.getUTCMonth() + 1} 月。` : '还没有文章。'}
+      用阅读器订阅 Atom 源，新文章发布时第一时间收到。
+    </p>
+    <a
+      href="/atom.xml"
+      class="mt-3 inline-flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 font-mono text-xs font-medium tracking-wide text-accent-fg transition-colors hover:bg-accent-hover"
+    >
+      Atom 订阅
+      <span aria-hidden="true">→</span>
+    </a>
+  </section>
+</aside>

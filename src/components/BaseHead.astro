@@ -1,0 +1,61 @@
+---
+import '../styles/global.css';
+import { siteConfig } from '../site.config';
+
+type Props = {
+  title: string;
+  description: string;
+  image?: string;
+  type?: 'website' | 'article';
+  publishedTime?: Date;
+  modifiedTime?: Date;
+};
+
+const { title, description, image, type = 'website', publishedTime, modifiedTime } = Astro.props;
+const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
+const pageTitle = isHome ? siteConfig.title : `${title} · ${siteConfig.title}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = image ? new URL(image, Astro.site).href : undefined;
+
+// Serif display faces for headings (Latin + CJK) and a mono for metadata. Loaded without blocking
+// first paint so a slow or unreachable fonts CDN only costs the swap, never the page.
+const fontsHref =
+  'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..700&display=swap';
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script is:inline>
+  const stored = localStorage.getItem('theme');
+  const system = matchMedia('(prefers-color-scheme: dark)');
+  document.documentElement.dataset.theme =
+    stored === 'light' || stored === 'dark' ? stored : system.matches ? 'dark' : 'light';
+  system.addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
+  });
+</script>
+<title>{pageTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta property="og:type" content={type} />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:site_name" content={siteConfig.title} />
+<meta property="og:locale" content="zh_CN" />
+{ogImage && <meta property="og:image" content={ogImage} />}
+{publishedTime && <meta property="article:published_time" content={publishedTime.toISOString()} />}
+{modifiedTime && <meta property="article:modified_time" content={modifiedTime.toISOString()} />}
+<meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="alternate" type="application/atom+xml" title={siteConfig.title} href="/atom.xml" />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#e6edf4" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121820" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+{/* set:html keeps astro check from type-checking the inline onload swap as TypeScript */}
+<Fragment
+  set:html={`<link rel="preload" as="style" href="${fontsHref}" onload="this.onload=null;this.rel='stylesheet'">`}
+/>
+<noscript><link rel="stylesheet" href={fontsHref} /></noscript>

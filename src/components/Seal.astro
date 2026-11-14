@@ -1,0 +1,44 @@
+---
+import { siteConfig } from '../site.config';
+
+type Props = {
+  text?: string;
+  size?: number;
+  class?: string;
+};
+
+const { text = siteConfig.seal, size = 40, class: className } = Astro.props;
+---
+
+<span class:list={['seal', className]} style={`--seal-size: ${size}px`} aria-hidden="true">{text}</span>
+
+<style>
+  .seal {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--seal-size);
+    block-size: var(--seal-size);
+    border-radius: calc(var(--seal-size) * 0.18);
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: calc(var(--seal-size) * 0.55);
+    line-height: 1;
+    transform: rotate(-4deg);
+    box-shadow: 0 1px 0 rgb(var(--shadow-rgb) / 0.2);
+    user-select: none;
+  }
+
+  .seal::before {
+    content: "";
+    position: absolute;
+    inset: calc(var(--seal-size) * 0.09);
+    border: 1px solid currentColor;
+    border-radius: calc(var(--seal-size) * 0.1);
+    opacity: 0.55;
+  }
+</style>

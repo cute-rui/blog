@@ -1,0 +1,36 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { countTags, getPublishedPosts, type Post } from '../../lib/posts';
+import SidebarLayout from '../../layouts/SidebarLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import PostCard from '../../components/PostCard.astro';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await getPublishedPosts();
+  return countTags(posts).map(({ tag }) => ({
+    params: { tag },
+    props: { posts: posts.filter((post) => post.data.tags.includes(tag)) },
+  }));
+};
+
+type Props = {
+  posts: Post[];
+};
+
+const { tag } = Astro.params;
+const { posts } = Astro.props;
+const allPosts = await getPublishedPosts();
+---
+
+<SidebarLayout title={`标签：${tag}`} description={`标签 ${tag} 下的文章`} posts={allPosts}>
+  <PageHeader kicker="Tag" title={`# ${tag}`} meta={`共 ${posts.length} 篇`} />
+  <div class="mt-8 grid gap-4">
+    {posts.map((post) => <PostCard post={post} />)}
+  </div>
+  <a
+    href="/tags/"
+    class="mt-10 inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 font-mono text-xs tracking-wide transition-colors hover:border-accent hover:text-accent"
+  >
+    <span aria-hidden="true">←</span> 全部标签
+  </a>
+</SidebarLayout>

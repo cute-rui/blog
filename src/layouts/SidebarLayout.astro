@@ -1,0 +1,24 @@
+---
+import type { Post } from '../lib/posts';
+import BaseLayout from './BaseLayout.astro';
+import Sidebar from '../components/Sidebar.astro';
+
+type Props = {
+  title: string;
+  description: string;
+  /** All published posts; the sidebar derives tags, archive and stats from them. */
+  posts: Post[];
+};
+
+const { title, description, posts } = Astro.props;
+---
+
+<BaseLayout title={title} description={description} width="full">
+  <slot name="hero" />
+  <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-14">
+    <div class="min-w-0">
+      <slot />
+    </div>
+    <Sidebar posts={posts} />
+  </div>
+</BaseLayout>

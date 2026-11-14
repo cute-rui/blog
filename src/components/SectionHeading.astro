@@ -1,0 +1,23 @@
+---
+type Props = {
+  number?: string;
+  title: string;
+  href?: string;
+  linkLabel?: string;
+};
+
+const { number, title, href, linkLabel = '全部' } = Astro.props;
+---
+
+<div class="flex items-baseline gap-4">
+  {number && <span class="kicker text-accent">{number}</span>}
+  <h2 class="font-serif text-xl font-semibold tracking-tight">{title}</h2>
+  <span class="h-px flex-1 self-center bg-line" aria-hidden="true"></span>
+  {
+    href && (
+      <a href={href} class="kicker transition-colors hover:text-accent">
+        {linkLabel} →
+      </a>
+    )
+  }
+</div>

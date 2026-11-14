@@ -1,0 +1,18 @@
+---
+import { tagUrl } from '../lib/posts';
+
+type Props = {
+  tag: string;
+  count?: number;
+};
+
+const { tag, count } = Astro.props;
+---
+
+<a
+  href={tagUrl(tag)}
+  class="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-0.5 font-mono text-[0.72rem] font-medium tracking-wide text-accent transition-colors hover:bg-accent hover:text-accent-fg"
+>
+  <span class="opacity-60" aria-hidden="true">#</span>{tag}
+  {count !== undefined && <span class="opacity-60">{count}</span>}
+</a>

@@ -1,0 +1,36 @@
+---
+import { Image } from 'astro:assets';
+import type { Post } from '../lib/posts';
+import CoverFallback from './CoverFallback.astro';
+
+type Props = {
+  post: Post;
+  class?: string;
+  /** Output box the image is cropped to; the rendered box should share this aspect ratio. */
+  width?: number;
+  height?: number;
+  sizes?: string;
+  priority?: boolean;
+};
+
+const { post, class: className, width = 960, height = 600, sizes, priority = false } = Astro.props;
+const { heroImage, heroAlt = '' } = post.data;
+---
+
+{
+  heroImage ? (
+    <Image
+      src={heroImage}
+      alt={heroAlt}
+      width={width}
+      height={height}
+      fit="cover"
+      layout="constrained"
+      sizes={sizes}
+      priority={priority}
+      class={className}
+    />
+  ) : (
+    <CoverFallback post={post} class={className} />
+  )
+}

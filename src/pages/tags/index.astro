@@ -1,0 +1,46 @@
+---
+import { countTags, getPublishedPosts, tagUrl } from '../../lib/posts';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+
+const posts = await getPublishedPosts();
+const tags = countTags(posts);
+const max = tags[0]?.count ?? 1;
+
+// 1.1rem for a one-post tag up to ~2.4rem for the most used one.
+function tagSize(count: number): string {
+  return `${(1.1 + (count / max) * 1.3).toFixed(2)}rem`;
+}
+---
+
+<BaseLayout title="标签" description="按标签浏览文章" width="wide">
+  <PageHeader
+    kicker="Tags"
+    title="标签"
+    meta={`${tags.length} 个标签 · ${posts.length} 篇文章`}
+    description="字号越大的标签，文章越多。"
+  />
+  {
+    tags.length === 0 ? (
+      <p class="mt-8 text-muted">还没有标签。</p>
+    ) : (
+      <ul class="mt-10 flex flex-wrap items-baseline gap-x-8 gap-y-5">
+        {tags.map(({ tag, count }, i) => (
+          <li class="reveal" style={`--i: ${i}`}>
+            <a
+              href={tagUrl(tag)}
+              class="group inline-flex items-baseline gap-2 font-serif font-semibold leading-none tracking-tight transition-colors hover:text-accent"
+              style={`font-size: ${tagSize(count)}`}
+            >
+              <span class="text-accent/50 transition-colors group-hover:text-accent" aria-hidden="true">
+                #
+              </span>
+              {tag}
+              <span class="kicker">{count}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</BaseLayout>

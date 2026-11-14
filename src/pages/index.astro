@@ -1,0 +1,97 @@
+---
+import { siteConfig } from '../site.config';
+import { getPublishedPosts } from '../lib/posts';
+import SidebarLayout from '../layouts/SidebarLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import Seal from '../components/Seal.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+
+const posts = await getPublishedPosts();
+const [featured, ...rest] = posts;
+const recent = rest.slice(0, 5);
+---
+
+<SidebarLayout title={siteConfig.title} description={siteConfig.description} posts={posts}>
+  <Fragment slot="hero">
+    <section class="mb-12 grid gap-8 border-b border-line pb-10 sm:mb-16 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-12 sm:pb-12">
+      <div>
+        <p class="reveal kicker text-accent" style="--i: 0">个人博客 · {siteConfig.author}</p>
+        <h1
+          class="reveal mt-5 font-serif text-5xl font-semibold leading-[1.05] tracking-tight text-balance sm:text-7xl"
+          style="--i: 1"
+        >
+          {siteConfig.title}
+        </h1>
+        <p class="reveal mt-6 max-w-lg text-lg leading-relaxed text-muted sm:hidden" style="--i: 2">
+          {siteConfig.description}
+        </p>
+        <p class="reveal kicker mt-8 flex flex-wrap items-center gap-x-2 gap-y-1" style="--i: 2">
+          <span>共 {posts.length} 篇文章</span>
+          {
+            featured && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>
+                  最近更新 <FormattedDate date={featured.data.pubDate} />
+                </span>
+              </>
+            )
+          }
+        </p>
+        <div class="reveal mt-6 flex flex-wrap gap-3" style="--i: 3">
+          <a
+            href="/posts/"
+            class="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition-colors hover:bg-accent-hover"
+          >
+            阅读文章 <span aria-hidden="true">→</span>
+          </a>
+          <a
+            href="/about/"
+            class="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-4 py-2 text-sm text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            关于我
+          </a>
+        </div>
+      </div>
+      <div class="reveal hidden items-start gap-5 sm:flex" style="--i: 2" aria-hidden="true">
+        <p
+          class="border-l border-line pl-5 font-serif text-lg leading-none tracking-[0.3em] text-muted [text-orientation:mixed] [writing-mode:vertical-rl]"
+        >
+          {siteConfig.description}
+        </p>
+        <Seal size={44} />
+      </div>
+    </section>
+  </Fragment>
+
+  <SectionHeading number="01" title="最新文章" href="/posts/" linkLabel="全部文章" />
+  {
+    featured ? (
+      <>
+        <div class="reveal mt-6" style="--i: 4">
+          <PostCard post={featured} variant="featured" />
+        </div>
+        {recent.length > 0 && (
+          <div class="mt-5 grid gap-4">
+            {recent.map((post, i) => (
+              <div class="reveal" style={`--i: ${i + 5}`}>
+                <PostCard post={post} />
+              </div>
+            ))}
+          </div>
+        )}
+        {posts.length > recent.length + 1 && (
+          <a
+            href="/posts/"
+            class="mt-8 inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 font-mono text-xs tracking-wide transition-colors hover:border-accent hover:text-accent"
+          >
+            查看全部 {posts.length} 篇文章 <span aria-hidden="true">→</span>
+          </a>
+        )}
+      </>
+    ) : (
+      <p class="mt-6 text-muted">还没有文章。在 content/posts/ 下新建一个 Markdown 文件开始写作。</p>
+    )
+  }
+</SidebarLayout>

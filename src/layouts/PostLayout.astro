@@ -1,0 +1,136 @@
+---
+import type { MarkdownHeading } from 'astro';
+import { Image } from 'astro:assets';
+import { tocHeadings } from '../lib/headings';
+import { readingTime } from '../lib/reading-time';
+import { postUrl, type Post } from '../lib/posts';
+import BaseLayout from './BaseLayout.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import Tag from '../components/Tag.astro';
+import TableOfContents from '../components/TableOfContents.astro';
+
+type Props = {
+  post: Post;
+  headings: MarkdownHeading[];
+  prev?: Post;
+  next?: Post;
+};
+
+const { post, headings, prev, next } = Astro.props;
+const { title, description, pubDate, updatedDate, tags, heroImage, heroAlt = '' } = post.data;
+const { minutes, words } = readingTime(post.body);
+const showToc = tocHeadings(headings).length >= 2;
+const adjacent =
+  'group flex flex-col gap-1 rounded-2xl border border-line bg-surface p-4 shadow-card transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-card-hover';
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  type="article"
+  publishedTime={pubDate}
+  modifiedTime={updatedDate}
+  image={heroImage?.src}
+  width="wide"
+>
+  <div class="reading-progress" aria-hidden="true"></div>
+  <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-14">
+    <div class="min-w-0">
+      <article>
+        <header>
+          <p class="kicker flex flex-wrap items-center gap-x-2 gap-y-1">
+            <FormattedDate date={pubDate} />
+            {
+              updatedDate && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    更新于 <FormattedDate date={updatedDate} />
+                  </span>
+                </>
+              )
+            }
+            <span aria-hidden="true">·</span>
+            <span>{minutes} 分钟阅读</span>
+            <span aria-hidden="true">·</span>
+            <span>{words.toLocaleString('zh-CN')} 字</span>
+          </p>
+          <h1 class="mt-4 font-serif text-3xl font-semibold leading-tight tracking-tight text-balance sm:text-5xl">
+            {title}
+          </h1>
+          <p class="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{description}</p>
+          {
+            tags.length > 0 && (
+              <div class="mt-5 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <Tag tag={tag} />
+                ))}
+              </div>
+            )
+          }
+        </header>
+        {
+          heroImage && (
+            <figure class="mt-10 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+              <Image
+                src={heroImage}
+                alt={heroAlt}
+                layout="constrained"
+                sizes="(min-width: 1024px) 720px, 100vw"
+                priority
+                class="w-full"
+              />
+            </figure>
+          )
+        }
+        {
+          showToc && (
+            <details class="mt-8 rounded-2xl border border-line bg-surface p-4 lg:hidden">
+              <summary class="kicker cursor-pointer select-none">目录</summary>
+              <div class="mt-3">
+                <TableOfContents headings={headings} />
+              </div>
+            </details>
+          )
+        }
+        <div class="prose mt-10 max-w-none">
+          <slot />
+        </div>
+      </article>
+      {
+        (prev || next) && (
+          <nav aria-label="上下篇" class="mt-16 grid gap-4 border-t border-line pt-8 sm:grid-cols-2">
+            {prev ? (
+              <a href={postUrl(prev)} class={adjacent}>
+                <span class="kicker">← 上一篇</span>
+                <span class="font-serif font-semibold leading-snug transition-colors group-hover:text-accent">
+                  {prev.data.title}
+                </span>
+              </a>
+            ) : (
+              <span />
+            )}
+            {next ? (
+              <a href={postUrl(next)} class:list={[adjacent, 'sm:text-right']}>
+                <span class="kicker">下一篇 →</span>
+                <span class="font-serif font-semibold leading-snug transition-colors group-hover:text-accent">
+                  {next.data.title}
+                </span>
+              </a>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )
+      }
+    </div>
+    <aside class="hidden lg:block">
+      <div class="sticky top-24 space-y-6">
+        <TableOfContents headings={headings} />
+        <a href="#main" class="kicker inline-flex items-center gap-1 transition-colors hover:text-accent">
+          回到顶部 <span aria-hidden="true">↑</span>
+        </a>
+      </div>
+    </aside>
+  </div>
+</BaseLayout>
