@@ -2,7 +2,7 @@
 
 把 CommonMark 加一小段 GFM 渲染成公众号能粘贴的 HTML。样式都写在元素的 `style` 上。
 
-这是一个纯函数库，没有文件读写，也没有网络。上传图片、拼复制页、调用微信接口都在库外面做。Android 绑定以后再接这个 crate，本目录没有 UniFFI，也没有 `android/` 目标。
+这是一个纯函数库，没有文件读写，也没有网络。上传图片、拼复制页、调用微信接口都在库外面做。App 用 `md2wx/ffi` 里的 UniFFI 绑定调用同一份 `render`。绑定层只做字符串拷贝，也不读写文件、也不联网。仓库不提交 `.so`。
 
 ## 公开 API
 
@@ -62,3 +62,35 @@ cargo test --manifest-path md2wx/Cargo.toml
 `tests/fixtures/` 里是标题、段落、列表、引用、代码、表格、图片、外链脚注的快照。更新快照时设置 `UPDATE_SNAPSHOTS=1`。
 
 构建依赖当前的 stable Rust（本仓库在 1.100 上测过）。syntect 使用 `regex-fancy`，不编译 C 的 onig。
+
+宿主上再跑一遍同一组快照，走的是 UniFFI 导出的函数：
+
+```sh
+cargo test --manifest-path md2wx/ffi/Cargo.toml
+```
+
+## Android
+
+Kotlin 绑定在 `md2wx/bindings/kotlin/uniffi/md2wx/md2wx.kt`，包名 `uniffi.md2wx`。入口是 `blogTheme()` 和 `render(markdown, options)`。`options.imageBaseUrl` 为空时图片仍是 `{{wx-img:N}}`。返回的 `Rendered` 含 `html`、`images`、`charCount`、`byteLen`。动态库名是 `md2wx_android`（`libmd2wx_android.so`）。生成代码用 JNA 加载它。配置在 `md2wx/ffi/uniffi.toml`，UniFFI 0.29.5。
+
+重新生成绑定（只在改了导出签名之后）：
+
+```sh
+cargo build --manifest-path md2wx/ffi/Cargo.toml --features cli
+md2wx/ffi/target/debug/uniffi-bindgen generate \
+  --library md2wx/ffi/target/debug/libmd2wx_android.so \
+  --language kotlin \
+  --out-dir md2wx/bindings/kotlin \
+  --no-format
+```
+
+交叉编译需要已安装的 Android NDK（`ANDROID_NDK_HOME`）和 `cargo-ndk`。`cargo-ndk` 在当前目录找 `Cargo.toml`，所以要在 `md2wx/ffi` 里跑。产物写到 `md2wx/jniLibs/`，该目录被 gitignore，不要提交：
+
+```sh
+rustup target add aarch64-linux-android x86_64-linux-android
+cargo install cargo-ndk
+cd md2wx/ffi
+cargo ndk -t arm64-v8a -t x86_64 -o ../jniLibs build --release
+```
+
+`arm64-v8a` 给设备，`x86_64` 给模拟器。App 工程把对应的 `libmd2wx_android.so` 放进 `jniLibs/<abi>/`。本仓库的 `android/` 不在这个 crate 里改。
