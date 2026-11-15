@@ -1,4 +1,5 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
+import { listedOnBlog } from './publish';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -8,7 +9,7 @@ export interface TagCount {
 }
 
 export async function getPublishedPosts(): Promise<Post[]> {
-  const posts = await getCollection('posts', ({ data }) => !import.meta.env.PROD || !data.draft);
+  const posts = await getCollection('posts', ({ data }) => listedOnBlog(data, import.meta.env.PROD));
   return posts.sort((a, b) => {
     const byDate = b.data.pubDate.valueOf() - a.data.pubDate.valueOf();
     if (byDate !== 0) return byDate;

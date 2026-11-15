@@ -20,7 +20,11 @@
 
 ## 写一篇文章
 
-在 `content/posts/` 下新建文件。文件名就是页面路径。`hello-world.md` 对应 `/posts/hello-world/`。字段、图片和草稿规则见 [content/README.md](content/README.md)。
+文章在内容仓库的 `content/posts/<slug>/index.md`。目录名就是页面路径：`content/posts/hello-world/index.md` 对应 `/posts/hello-world/`。图片放在同一目录，正文用 `./figure.png` 这样的相对路径。`content/posts/hello-world.md` 这种单文件是旧布局，校验会要求你挪进目录。
+
+front matter 以 [schema/content-schema.json](schema/content-schema.json) 为准。在原有字段上增加了 `publish` 和 `wechat`。`publish` 整块不写时等于只发博客、不发生成公众号版本。`publish.blog: false` 的文章不进网站。`draft: true` 时两个目标都不发。发给公众号的文章必须是 `.md`。
+
+这个框架仓库的 `.gitignore` 忽略整个 `content/`。本仓库里没有文章，也不为内容仓库发明远程地址。内容仓库的目录、`notify.yml` 和 schema 的抄写说明在 [templates/blog-content/README.md](templates/blog-content/README.md)。
 
 ## 改站点信息
 
@@ -44,9 +48,23 @@
 
 ## 部署站点
 
-执行 `pnpm build`，产物在 `dist/`。构建机上必须同时检出框架仓库和内容仓库。两种做法写在 [content/README.md](content/README.md)。一种是分别克隆两个仓库。另一种是以后把 `content/` 改成 git submodule。
+`pnpm build` 会先编译 `md2wx`，再校验 `content/posts`，然后把静态站点写到 `dist/`。内容仓库还没检出时，`content/posts` 为空，站点仍然能构建。构建机上要同时有框架仓库和内容仓库，内容放在 `./content`。
 
-这个项目没有 Astro adapter。把 `dist/` 交给 GitHub Pages、Vercel、Netlify 或 Cloudflare Pages。
+GitHub Actions 在 [.github/workflows/publish.yml](.github/workflows/publish.yml)。内容仓库 push 到 `main` 之后，用 GitHub App 安装令牌发 `repository_dispatch`。workflow 模板在 [templates/blog-content/.github/workflows/notify.yml](templates/blog-content/.github/workflows/notify.yml)，复制到内容仓库后再启用。没有 `CLOUDFLARE_API_TOKEN` 时，workflow 会在 summary 里说明并跳过 `wrangler pages deploy`。
+
+## 公众号复制页
+
+`publish.wechat: true` 且不是草稿的文章，会在构建时得到 `dist/wx/<slug>-<key>/`。`<key>` 是 `HMAC-SHA256(WX_PAGE_KEY, slug)` 的前 10 位十六进制。没设置 `WX_PAGE_KEY` 时用 `dev-insecure-wx-page-key`，这个值写在日志里，不是密钥。
+
+`dist/wx/index.json` 的顶层 `wechatMode` 来自环境变量 `WECHAT_MODE`，缺省是 `html`。同一份清单也写到 `dist/wx/<catalogKey>/index.json`，`catalogKey` 是对字符串 `index` 做同样的 HMAC。App 首次配置填这个带前缀的地址。部署步骤会从公开目录去掉可猜的 `/wx/index.json`。
+
+复制页上的按钮是中文：复制正文、复制标题、复制摘要、下载封面、复制阅读原文链接。页面带 `noindex`，`public/_headers` 给 `/wx/*` 加了 `X-Robots-Tag: noindex`。
+
+Markdown 转公众号 HTML 在 [md2wx/README.md](md2wx/README.md)。`pnpm test:md2wx` 跑快照，`pnpm lint:content` 跑第 3.2 节的校验。
+
+## 在自己的电脑上做公众号探针
+
+不要把 AppSecret 写进仓库，也不要在 CI 里跑这个探针。步骤写在 [tools/wechat-probe/probe.mjs](tools/wechat-probe/probe.mjs) 开头。粘贴样本是 [tools/wechat-probe/sample-paste.html](tools/wechat-probe/sample-paste.html)。脚本把结果表写到 `wechat-probe-result.md`，这个文件已被 gitignore。
 
 ## 查看仓库路径
 
@@ -64,4 +82,10 @@
 - `src/layouts/`
 - `src/components/`
 - `src/pages/`
+- `src/integrations/wx-pages.ts`
+- `schema/content-schema.json`
+- `md2wx/`
+- `templates/blog-content/`
+- `tools/wechat-probe/`
+- `.github/workflows/publish.yml`
 - `content/`
