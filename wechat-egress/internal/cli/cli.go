@@ -36,7 +36,7 @@ func Run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	switch args[0] {
 	case "server":
 		return runServer(args[1:], getenv, stderr)
-	case "stable-token", "upload-image", "add-draft", "update-draft":
+	case "stable-token", "upload-image", "upload-cover", "add-draft", "update-draft":
 		return runClient(args[0], args[1:], getenv, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n\n%s", args[0], usage)
@@ -52,6 +52,7 @@ Server (on the VPS):
 Client (in the workflow; picks one):
   wechat-egress stable-token
   wechat-egress upload-image --file image.png
+  wechat-egress upload-cover --file cover.png
   wechat-egress add-draft --file draft.json
   wechat-egress update-draft --file draft.json
 
@@ -163,6 +164,22 @@ func runClient(cmd string, args []string, getenv func(string) string, stdout, st
 			return 1
 		}
 		return writeJSON(stdout, stderr, map[string]any{"url": url})
+	case "upload-cover":
+		if *file == "" {
+			fmt.Fprintln(stderr, "--file is required")
+			return 2
+		}
+		content, err := readLimited(*file, 1<<20)
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		mediaID, err := client.UploadCover(ctx, content, baseName(*file))
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return writeJSON(stdout, stderr, map[string]any{"media_id": mediaID})
 	case "add-draft":
 		articles, err := readAdd(*file)
 		if err != nil {

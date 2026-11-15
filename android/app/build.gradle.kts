@@ -39,6 +39,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets.named("main") {
+        kotlin.srcDir("$rootDir/../md2wx/bindings/kotlin")
+        jniLibs.srcDir("$rootDir/../md2wx/jniLibs")
+    }
 }
 
 kotlin {
@@ -55,6 +60,7 @@ dependencies {
     implementation(project(":core:ai"))
     implementation(project(":core:search"))
     implementation(project(":core:crypto"))
+    implementation(project(":core:egress"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -79,4 +85,5 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.coroutines.android)
     implementation(libs.browser)
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
 }

@@ -25,8 +25,10 @@ const (
 	officialHost    = "api.weixin.qq.com"
 	pathStableToken = "/cgi-bin/stable_token"
 	pathUploadImage = "/cgi-bin/media/uploadimg"
+	pathAddMaterial = "/cgi-bin/material/add_material"
 	pathDraftAdd    = "/cgi-bin/draft/add"
 	pathDraftUpdate = "/cgi-bin/draft/update"
+	coverType       = "image"
 	maxBody         = 1 << 20
 )
 
@@ -252,6 +254,33 @@ func (a *API) UploadImage(ctx context.Context, content []byte, filename string) 
 	return imageURL, err
 }
 
+// UploadCover stores a jpeg or png as permanent image material and returns
+// its media_id. draft/add uses that id as thumb_media_id. The material type
+// is fixed to image; this is not a general add_material proxy.
+func (a *API) UploadCover(ctx context.Context, content []byte, filename string) (string, error) {
+	contentType, safeName, err := validateImage(content, filename)
+	if err != nil {
+		return "", err
+	}
+	var mediaID string
+	err = a.withToken(ctx, func(token string) error {
+		body, partType, err := imageBody(safeName, contentType, content)
+		if err != nil {
+			return err
+		}
+		env, err := a.postExtra(ctx, "add_material", pathAddMaterial, token, partType, body, url.Values{"type": {coverType}})
+		if err != nil {
+			return err
+		}
+		if err := validMediaID(env.MediaID); err != nil {
+			return &CallError{Op: "add_material", Kind: "wechat", ErrMsg: "response did not include a media_id"}
+		}
+		mediaID = env.MediaID
+		return nil
+	})
+	return mediaID, err
+}
+
 // AddDraft calls draft/add. articles is the WeChat articles array.
 func (a *API) AddDraft(ctx context.Context, articles []Article) (string, error) {
 	if err := validateArticles(articles); err != nil {
@@ -357,11 +386,24 @@ func (a *API) postJSON(ctx context.Context, op, path, token string, body any) (e
 }
 
 func (a *API) post(ctx context.Context, op, path, token, contentType string, body io.Reader) (envelope, error) {
+	return a.postExtra(ctx, op, path, token, contentType, body, nil)
+}
+
+// postExtra adds a fixed query. Callers pass only constants they own.
+// extra must not come from an RPC field: this process is not an open proxy.
+func (a *API) postExtra(ctx context.Context, op, path, token, contentType string, body io.Reader, extra url.Values) (envelope, error) {
 	u := *a.base
 	u.Path = path
+	q := u.Query()
+	for key, values := range extra {
+		for _, value := range values {
+			q.Add(key, value)
+		}
+	}
 	if token != "" {
-		q := u.Query()
 		q.Set("access_token", token)
+	}
+	if len(q) > 0 {
 		u.RawQuery = q.Encode()
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), body)

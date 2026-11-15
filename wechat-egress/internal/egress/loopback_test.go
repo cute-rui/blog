@@ -55,6 +55,10 @@ func TestClientCallsServerOnLoopback(t *testing.T) {
 	if err != nil || url != "http://mmbiz.qpic.cn/test" {
 		t.Fatalf("upload %q %v", url, err)
 	}
+	coverID, err := client.UploadCover(ctx, pngBytes(t), "cover.png")
+	if err != nil || coverID != "cover-media" {
+		t.Fatalf("cover %q %v", coverID, err)
+	}
 	open := int32(1)
 	fans := int32(0)
 	mediaID, err := client.AddDraft(ctx, []*pb.Article{{
@@ -286,6 +290,11 @@ func newFakeWeChat(t *testing.T) *fakeWeChat {
 			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "access-token-value", "expires_in": 7200})
 		case "/cgi-bin/media/uploadimg":
 			_ = json.NewEncoder(w).Encode(map[string]any{"url": "http://mmbiz.qpic.cn/test", "errcode": 0})
+		case "/cgi-bin/material/add_material":
+			if r.URL.Query().Get("type") != "image" {
+				t.Errorf("cover type %q", r.URL.RawQuery)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"media_id": "cover-media", "errcode": 0})
 		case "/cgi-bin/draft/add":
 			fake.addBody = append([]byte(nil), body...)
 			_ = json.NewEncoder(w).Encode(map[string]any{"media_id": "draft-media"})

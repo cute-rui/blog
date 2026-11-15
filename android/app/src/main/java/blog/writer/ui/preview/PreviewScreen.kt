@@ -33,7 +33,8 @@ import androidx.lifecycle.viewModelScope
 import blog.writer.content.slugOf
 import blog.writer.data.repo.GithubSettingsRepository
 import blog.writer.data.repo.PostRepository
-import blog.writer.render.StubWechatMarkdownRenderer
+import blog.writer.data.repo.WechatDraftSync
+import blog.writer.egress.EgressException
 import blog.writer.render.WechatMarkdownRenderer
 import blog.writer.render.WechatRenderOptions
 import blog.writer.render.WechatTheme
@@ -45,6 +46,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.inject.Inject
@@ -56,13 +58,17 @@ class PreviewViewModel @Inject constructor(
     private val github: GithubSettingsRepository,
     private val renderer: WechatMarkdownRenderer,
     private val http: OkHttpClient,
+    private val drafts: WechatDraftSync,
 ) : ViewModel() {
     private val path = decodePath(savedStateHandle.get<String>("path").orEmpty())
-    val note = MutableStateFlow("公众号预览调用 md2wx 接口。当前绑定的是测试替身，不会把 Markdown 排成微信 HTML。")
+    val note = MutableStateFlow("公众号预览使用 md2wx。")
     val html = MutableStateFlow("")
     val mode = MutableStateFlow("公众号")
+    val hasDraft = MutableStateFlow(false)
+    private val sending = AtomicBoolean(false)
 
     init {
+        viewModelScope.launch(Dispatchers.IO) { hasDraft.value = drafts.hasDraft(path) }
         showWechat()
     }
 
@@ -70,16 +76,40 @@ class PreviewViewModel @Inject constructor(
         viewModelScope.launch {
             mode.value = "公众号"
             val document = posts.read(path)
-            val result = renderer.render(
-                markdown = document.body,
-                theme = WechatTheme(accent = "#2D5786", ink = "#1E1C19", paper = "#FAF7F0", muted = "#4C463E"),
-                options = WechatRenderOptions(imageUrlPrefix = ""),
+            val rendered = runCatching {
+                renderer.render(
+                    markdown = document.body,
+                    theme = WechatTheme(accent = "#2D5786", ink = "#1E1C19", paper = "#FAF7F0", muted = "#4C463E"),
+                    options = WechatRenderOptions(imageUrlPrefix = ""),
+                )
+            }
+            rendered.fold(
+                onSuccess = { result ->
+                    html.value = "<html><body style=\"background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px\">${result.htmlFragment}<p>图片 ${result.images.size} · ${result.length.characters} 字符</p></body></html>"
+                    note.value = "公众号预览"
+                },
+                onFailure = { error ->
+                    html.value = ""
+                    note.value = error.message ?: "md2wx 没有渲染"
+                },
             )
-            html.value = "<html><body style=\"background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px\">${result.htmlFragment}<p>图片 ${result.images.size} · ${result.length.characters} 字符</p></body></html>"
-            note.value = if (result.htmlFragment == StubWechatMarkdownRenderer.MARKER) {
-                "md2wx 还没有通过 UniFFI 接上。预览区是测试替身，复制公众号格式仍读取 CI 生成的复制页。"
-            } else {
-                "公众号预览"
+        }
+    }
+
+    fun sendDraft(onResult: (String) -> Unit) {
+        if (!sending.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            try {
+                val result = runCatching { drafts.send(path) }
+                result.fold(
+                    onSuccess = { sent ->
+                        hasDraft.value = true
+                        onResult(if (sent.updated) "已更新草稿箱里的这一篇" else "已放入草稿箱")
+                    },
+                    onFailure = { error -> onResult(draftFailure(error)) },
+                )
+            } finally {
+                sending.set(false)
             }
         }
     }
@@ -141,6 +171,7 @@ fun PreviewScreen(
     val note by model.note.collectAsState()
     val html by model.html.collectAsState()
     val mode by model.mode.collectAsState()
+    val hasDraft by model.hasDraft.collectAsState()
     var status by remember { mutableStateOf("") }
     var pageUrl by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -179,6 +210,15 @@ fun PreviewScreen(
                     )
                 }
             }) { Text("把复制页链接发到电脑") }
+            OutlinedButton(onClick = {
+                status = "正在放进草稿箱…"
+                model.sendDraft { result -> status = result }
+            }) { Text(if (hasDraft) "更新公众号草稿箱里的这一篇" else "放进公众号草稿箱") }
+            Text(
+                "不会群发。放进草稿箱之后，在公众号助手里检查再发。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             AndroidView(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 factory = { context -> WebView(context).apply { settings.javaScriptEnabled = false } },
@@ -187,6 +227,17 @@ fun PreviewScreen(
                 },
             )
         }
+    }
+}
+
+private fun draftFailure(error: Throwable): String {
+    val message = (error as? EgressException)?.message ?: error.message.orEmpty()
+    return when {
+        message.contains("出口令牌") || message.contains("WECHAT_EGRESS_TOKEN") -> "先在设置里填写出口令牌"
+        message.contains("SRV") -> "先在设置里填写 SRV 域名"
+        message.contains("libmd2wx") -> "还没有放进 libmd2wx_android.so。复制公众号格式仍读取 CI 生成的复制页。"
+        message.isBlank() -> "没有放进草稿箱"
+        else -> message
     }
 }
 

@@ -76,6 +76,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onLlm: () -> Unit,
     onGithub: () -> Unit,
+    onEgress: () -> Unit,
     onSearch: () -> Unit,
     model: SettingsViewModel = hiltViewModel(),
 ) {
@@ -87,6 +88,7 @@ fun SettingsScreen(
             SettingsRow("AI 模型", "配置档、连接测试、每个动作用哪个模型", onLlm)
             SettingsRow("搜索来源", "事实核查用的检索配置档", onSearch)
             SettingsRow("GitHub", "内容仓库、令牌、复制页清单", onGithub)
+            SettingsRow("微信出口", "SRV 域名和出口令牌。手机不保存 AppID", onEgress)
             Text("外观", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
             ToggleRow("跟随系统配色", appearance.dynamicColor) { model.update { current -> current.copy(dynamicColor = it) } }
             ToggleRow("触感反馈", appearance.haptics) { model.update { current -> current.copy(haptics = it) } }
@@ -158,7 +160,7 @@ fun LlmHomeScreen(
         AlertDialog(
             onDismissRequest = model::dismissClear,
             title = { Text("清除全部凭据？") },
-            text = { Text("API key 和 GitHub 令牌会从这台手机删掉。配置档还在。") },
+            text = { Text("API key、GitHub 令牌和微信出口令牌会从这台手机删掉。配置档还在。") },
             confirmButton = { TextButton(onClick = model::clear) { Text("清除", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = model::dismissClear) { Text("取消") } },
         )

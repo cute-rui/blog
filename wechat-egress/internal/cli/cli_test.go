@@ -43,6 +43,11 @@ func TestWorkflowCommandOnLoopback(t *testing.T) {
 		case "/cgi-bin/media/uploadimg":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"url":"http://mmbiz.qpic.cn/from-cli","errcode":0}`))
+		case "/cgi-bin/material/add_material":
+			if r.URL.Query().Get("type") != "image" {
+				t.Errorf("cover type %q", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"media_id":"cover-from-cli","errcode":0}`))
 		case "/cgi-bin/draft/add":
 			_, _ = w.Write([]byte(`{"media_id":"draft-from-cli"}`))
 		case "/cgi-bin/stable_token":
@@ -96,6 +101,12 @@ func TestWorkflowCommandOnLoopback(t *testing.T) {
 	code := Run([]string{"upload-image", "--file", img, "--timeout", "5s"}, mapEnv(env), &stdout, &stderr)
 	if code != 0 || !strings.Contains(stdout.String(), "http://mmbiz.qpic.cn/from-cli") {
 		t.Fatalf("upload code %d\n%s\n%s", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Run([]string{"upload-cover", "--file", img, "--timeout", "5s"}, mapEnv(env), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "cover-from-cli") {
+		t.Fatalf("cover code %d\n%s\n%s", code, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
 	stderr.Reset()

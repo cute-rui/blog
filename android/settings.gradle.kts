@@ -25,4 +25,5 @@ include(
     ":core:ai",
     ":core:search",
     ":core:crypto",
+    ":core:egress",
 )

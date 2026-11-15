@@ -3,6 +3,8 @@ syntax = "proto3";
 package blog.wechat.egress.v1;
 
 option go_package = "github.com/lightwing/blog/wechat-egress/internal/pb;pb";
+option java_package = "blog.wechat.egress.v1";
+option java_multiple_files = true;
 
 // WechatEgress is the fixed-IP front for the draft APIs.
 // The server calls api.weixin.qq.com. Callers send a bearer token and never
@@ -10,6 +12,11 @@ option go_package = "github.com/lightwing/blog/wechat-egress/internal/pb;pb";
 service WechatEgress {
   rpc GetStableToken(GetStableTokenRequest) returns (GetStableTokenResponse);
   rpc UploadImage(UploadImageRequest) returns (UploadImageResponse);
+  // UploadCover stores a jpeg or png as permanent image material and returns
+  // the media_id that draft/add expects in thumb_media_id. The server always
+  // uses material/add_material with type=image. Callers cannot pick another
+  // material type or another WeChat URL.
+  rpc UploadCover(UploadCoverRequest) returns (UploadCoverResponse);
   rpc AddDraft(AddDraftRequest) returns (AddDraftResponse);
   rpc UpdateDraft(UpdateDraftRequest) returns (UpdateDraftResponse);
 }
@@ -29,6 +36,16 @@ message UploadImageRequest {
 
 message UploadImageResponse {
   string url = 1;
+}
+
+message UploadCoverRequest {
+  bytes content = 1;
+  // filename is optional. The server sniffs jpeg/png and rejects a mismatch.
+  string filename = 2;
+}
+
+message UploadCoverResponse {
+  string media_id = 1;
 }
 
 message CoverCrop {

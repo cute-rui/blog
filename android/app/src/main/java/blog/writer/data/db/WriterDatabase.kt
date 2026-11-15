@@ -164,6 +164,12 @@ data class FillMarkEntity(
     val ending: String?,
 )
 
+@Entity(tableName = "wechat_drafts")
+data class WechatDraftEntity(
+    @PrimaryKey val path: String,
+    val mediaId: String,
+)
+
 @Dao
 interface WriterDao {
     @Query("SELECT * FROM posts ORDER BY updatedAtEpochMs DESC")
@@ -267,6 +273,12 @@ interface WriterDao {
 
     @Upsert
     suspend fun upsertFillMarks(marks: FillMarkEntity)
+
+    @Query("SELECT * FROM wechat_drafts WHERE path = :path")
+    fun wechatDraft(path: String): WechatDraftEntity?
+
+    @Upsert
+    fun upsertWechatDraft(draft: WechatDraftEntity)
 }
 
 @Database(
@@ -280,8 +292,9 @@ interface WriterDao {
         SearchProfileEntity::class,
         AiHistoryEntity::class,
         FillMarkEntity::class,
+        WechatDraftEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class WriterDatabase : RoomDatabase() {

@@ -23,14 +23,15 @@ go build -o wechat-egress ./cmd/wechat-egress
 
 把 VPS 的公网 IP 填进公众号的 API IP 白名单。同一个 `WECHAT_EGRESS_TOKEN` 放到博客仓库的 Actions secret。不要把 AppSecret 放进 GitHub。
 
-进程只请求这四个路径，不会按调用方给的 URL 转发：
+进程只请求这五个路径，不会按调用方给的 URL 转发：
 
 - `POST /cgi-bin/stable_token`（`force_refresh` 固定为 false）
-- `POST /cgi-bin/media/uploadimg`
+- `POST /cgi-bin/media/uploadimg`（正文图，返回可放进 HTML 的 URL）
+- `POST /cgi-bin/material/add_material?type=image`（封面永久素材，返回 `media_id`）
 - `POST /cgi-bin/draft/add`
 - `POST /cgi-bin/draft/update`
 
-`thumb_media_id` 由调用方放进草稿 JSON。这个服务不上传永久封面素材。
+封面的素材类型固定是 `image`。调用方不能改 type，也不能指定别的微信地址。`UploadCover` 返回的 `media_id` 填进草稿的 `thumb_media_id`。手机和 CI 都不直接调用微信。
 
 `--insecure` 只允许监听回环地址，给本机测试用。
 
@@ -67,10 +68,13 @@ _wechat._tcp 300 IN SRV 0 10 8443 egress
   run: |
     go build -o "$RUNNER_TEMP/wechat-egress" ./cmd/wechat-egress
     "$RUNNER_TEMP/wechat-egress" upload-image --file "$IMAGE_FILE"
+    "$RUNNER_TEMP/wechat-egress" upload-cover --file "$COVER_FILE"
     "$RUNNER_TEMP/wechat-egress" add-draft --file "$DRAFT_JSON"
 ```
 
 `stable-token` 会把 access token 打到标准输出，不要写进 workflow summary。
+
+手机上的写作 App 走同一套 gRPC，不走上面的命令行。它查询 `_wechat._tcp.<域名>`，每次调用带出口令牌。正文图用 `UploadImage`，封面用 `UploadCover`，然后 `AddDraft`；已经有草稿 id 时改用 `UpdateDraft`。手机不调用 `stable_token`，微信 access token 留在 VPS。App 不保存 AppID 和 AppSecret，也不请求 `api.weixin.qq.com`。
 
 ## 测试
 
