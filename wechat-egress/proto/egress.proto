@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package blog.wechat.egress.v1;
+
+option go_package = "github.com/lightwing/blog/wechat-egress/internal/pb;pb";
+
+// WechatEgress is the fixed-IP front for the draft APIs.
+// The server calls api.weixin.qq.com. Callers send a bearer token and never
+// send AppID or AppSecret.
+service WechatEgress {
+  rpc GetStableToken(GetStableTokenRequest) returns (GetStableTokenResponse);
+  rpc UploadImage(UploadImageRequest) returns (UploadImageResponse);
+  rpc AddDraft(AddDraftRequest) returns (AddDraftResponse);
+  rpc UpdateDraft(UpdateDraftRequest) returns (UpdateDraftResponse);
+}
+
+message GetStableTokenRequest {}
+
+message GetStableTokenResponse {
+  string access_token = 1;
+  int32 expires_in = 2;
+}
+
+message UploadImageRequest {
+  bytes content = 1;
+  // filename is optional. The server sniffs jpeg/png and rejects a mismatch.
+  string filename = 2;
+}
+
+message UploadImageResponse {
+  string url = 1;
+}
+
+message CoverCrop {
+  string ratio = 1;
+  string x1 = 2;
+  string y1 = 3;
+  string x2 = 4;
+  string y2 = 5;
+}
+
+message Article {
+  string article_type = 1;
+  string title = 2;
+  string author = 3;
+  string digest = 4;
+  string content = 5;
+  string content_source_url = 6;
+  string thumb_media_id = 7;
+  optional int32 need_open_comment = 8;
+  optional int32 only_fans_can_comment = 9;
+  repeated CoverCrop cover_crops = 10;
+}
+
+message AddDraftRequest {
+  repeated Article articles = 1;
+}
+
+message AddDraftResponse {
+  string media_id = 1;
+}
+
+message UpdateDraftRequest {
+  string media_id = 1;
+  uint32 index = 2;
+  Article article = 3;
+}
+
+message UpdateDraftResponse {}
