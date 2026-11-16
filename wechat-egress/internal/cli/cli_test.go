@@ -117,16 +117,18 @@ func TestWorkflowCommandOnLoopback(t *testing.T) {
 }
 
 func TestServerRejectsPublicInsecureListen(t *testing.T) {
-	env := map[string]string{
-		"WECHAT_APPID":        "wx-server",
-		"WECHAT_APPSECRET":    "server-secret-value",
-		"WECHAT_EGRESS_TOKEN": "test-bearer-token",
-		"WECHAT_API_BASE":     "http://127.0.0.1:9",
-	}
+	path := writeServerConfig(t, `
+app_id = "wx-server"
+app_secret = "server-secret-value"
+token = "test-bearer-token"
+listen = "0.0.0.0:8443"
+insecure = true
+api_base = "http://127.0.0.1:9"
+`)
 	done := make(chan int, 1)
 	go func() {
 		var stderr bytes.Buffer
-		done <- Run([]string{"server", "--listen", "0.0.0.0:8443", "--insecure"}, mapEnv(env), ioDiscard{}, &stderr)
+		done <- Run([]string{"server", "--config", path}, mapEnv(nil), ioDiscard{}, &stderr)
 	}()
 	select {
 	case code := <-done:
@@ -136,6 +138,47 @@ func TestServerRejectsPublicInsecureListen(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("server did not reject the listen address")
 	}
+}
+
+func TestServerRequiresConfigFile(t *testing.T) {
+	env := map[string]string{
+		"WECHAT_APPID":           "wx-server",
+		"WECHAT_APPSECRET":       "server-secret-value",
+		"WECHAT_EGRESS_TOKEN":    "test-bearer-token",
+		"WECHAT_EGRESS_LISTEN":   "127.0.0.1:9",
+		"WECHAT_EGRESS_TLS_CERT": "/tmp/cert.pem",
+		"WECHAT_EGRESS_TLS_KEY":  "/tmp/key.pem",
+		"WECHAT_API_BASE":        "http://127.0.0.1:9",
+		"WECHAT_EGRESS_INSECURE": "1",
+	}
+	var stderr bytes.Buffer
+	code := Run([]string{"server"}, mapEnv(env), ioDiscard{}, &stderr)
+	if code != 2 || !strings.Contains(stderr.String(), "WECHAT_EGRESS_CONFIG") {
+		t.Fatalf("code %d stderr %s", code, stderr.String())
+	}
+
+	path := writeServerConfig(t, `
+app_id = "wx-server"
+app_secret = "server-secret-value"
+token = "test-bearer-token"
+listen = "127.0.0.1:9"
+insecure = true
+api_base = "https://evil.example"
+`)
+	stderr.Reset()
+	code = Run([]string{"server", "--config", path}, mapEnv(env), ioDiscard{}, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "not allowed") {
+		t.Fatalf("code %d stderr %s", code, stderr.String())
+	}
+}
+
+func writeServerConfig(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func mapEnv(env map[string]string) func(string) string {
