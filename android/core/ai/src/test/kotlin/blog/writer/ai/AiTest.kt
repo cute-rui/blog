@@ -12,6 +12,11 @@ import blog.writer.search.SearchOrigin
 import blog.writer.search.SearchRouter
 import blog.writer.search.SearchSourceKind
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -38,7 +43,17 @@ class AiTest {
         assertEquals("https://generativelanguage.googleapis.com", LlmPresets.gemini.baseUrl)
         assertEquals(LlmProtocol.Gemini, LlmPresets.gemini.protocol)
         assertEquals("https://openrouter.ai/api/v1", LlmPresets.openRouter.baseUrl)
-        assertEquals(11, LlmPresets.all.size)
+        assertEquals("http://127.0.0.1:3425/v1", LlmPresets.magpie.baseUrl)
+        assertEquals(LlmProtocol.OpenAiCompatible, LlmPresets.magpie.protocol)
+        assertEquals("Magpie", LlmPresets.magpie.name)
+        assertEquals("deepseek/deepseek-v4-pro", LlmPresets.magpie.defaultModel)
+        assertEquals("http://127.0.0.1:3425/v1/chat/completions", joinUrl(LlmPresets.magpie.baseUrl, "/chat/completions"))
+        assertEquals("http://127.0.0.1:3425/v1/models", joinUrl(LlmPresets.magpie.baseUrl, "/models"))
+        assertTrue(LlmPresets.magpie.stream)
+        assertTrue(LlmPresets.magpie.jsonOutput)
+        assertTrue(LlmPresets.domestic.contains(LlmPresets.magpie))
+        assertNull(validateBaseUrl(LlmPresets.magpie.baseUrl, allowHttp = true))
+        assertEquals(12, LlmPresets.all.size)
         assertTrue(LlmPresets.kimi.builtinSearch)
         assertFalse(LlmPresets.deepSeek.builtinSearch)
         assertEquals("自定义", LlmPresets.all.last().name)
@@ -164,6 +179,80 @@ class AiTest {
             val authed = recorded.first { it.getHeader("Authorization") != null }
             assertEquals("Bearer test-key", authed.getHeader("Authorization"))
             assertTrue(authed.path!!.endsWith("/chat/completions"))
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun magpieChatRequestUsesTheOpenAiClient() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Type", "text/event-stream")
+                    .setBody(
+                        """
+                        data: {"model":"deepseek/deepseek-v4-pro","choices":[{"delta":{"content":"{\"ok\":true}"}}]}
+
+                        data: [DONE]
+
+                        """.trimIndent(),
+                    ),
+            )
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"data":[{"id":"deepseek/deepseek-v4-pro"},{"id":"deepseek/deepseek-v4-flash"}]}"""),
+            )
+            val preset = LlmPresets.magpie
+            val endpoint = LlmEndpoint(
+                protocol = preset.protocol,
+                baseUrl = server.url("/v1").toString().trimEnd('/'),
+                apiKey = "gateway-key",
+                model = preset.defaultModel,
+                stream = preset.stream,
+                jsonOutput = preset.jsonOutput,
+                firstTokenTimeoutSec = 5,
+                totalTimeoutSec = 10,
+            )
+            val provider = LlmClients(OkHttpClient()).create(endpoint)
+            assertTrue(provider is OpenAiCompatibleProvider)
+            val events = mutableListOf<LlmEvent>()
+            provider.stream(
+                LlmRequest(
+                    model = preset.defaultModel,
+                    system = "sys",
+                    user = "hi",
+                    temperature = 0.0,
+                    maxOutputTokens = 16,
+                    stream = preset.stream,
+                    jsonObject = preset.jsonOutput,
+                ),
+            ).collect { events += it }
+            val chat = server.takeRequest()
+            assertEquals("POST", chat.method)
+            assertEquals("/v1/chat/completions", chat.path)
+            assertEquals("Bearer gateway-key", chat.getHeader("Authorization"))
+            assertEquals("blog-writer", chat.getHeader("User-Agent"))
+            val body = Json.parseToJsonElement(chat.body.readUtf8()).jsonObject
+            assertEquals(preset.defaultModel, body.getValue("model").jsonPrimitive.content)
+            assertEquals(true, body.getValue("stream").jsonPrimitive.boolean)
+            assertEquals("json_object", body.getValue("response_format").jsonObject.getValue("type").jsonPrimitive.content)
+            assertEquals(16, body.getValue("max_tokens").jsonPrimitive.content.toInt())
+            val messages = body.getValue("messages").jsonArray
+            assertEquals("system", messages[0].jsonObject.getValue("role").jsonPrimitive.content)
+            assertEquals("user", messages[1].jsonObject.getValue("role").jsonPrimitive.content)
+            assertEquals("{\"ok\":true}", events.filterIsInstance<LlmEvent.TextDelta>().joinToString("") { it.text })
+            assertEquals(
+                listOf("deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"),
+                provider.listModels(),
+            )
+            val catalog = server.takeRequest()
+            assertEquals("GET", catalog.method)
+            assertEquals("/v1/models", catalog.path)
+            assertEquals("Bearer gateway-key", catalog.getHeader("Authorization"))
         } finally {
             server.shutdown()
         }

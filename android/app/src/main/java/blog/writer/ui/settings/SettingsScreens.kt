@@ -364,9 +364,10 @@ class LlmEditViewModel @Inject constructor(
     }
 
     fun applyPreset(preset: LlmPreset) {
+        val previousName = LlmPresets.byId(presetId)?.name
         presetId = preset.id
         if (preset.id != "custom") {
-            name = if (name.isBlank() || LlmPresets.byId(presetId)?.name == name) preset.name else name
+            if (name.isBlank() || name == previousName) name = preset.name
             protocol = preset.protocol
             baseUrl = preset.baseUrl
             modelName = preset.defaultModel
@@ -374,6 +375,7 @@ class LlmEditViewModel @Inject constructor(
             stream = preset.stream
             jsonOutput = preset.jsonOutput
             builtinSearch = preset.builtinSearch
+            allowHttp = preset.baseUrl.startsWith("http://")
         }
     }
 
