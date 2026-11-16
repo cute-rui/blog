@@ -1,4 +1,5 @@
 package blog.writer.data.repo
+import blog.writer.copy.Copy
 
 import blog.writer.content.FrontMatterCodec
 import blog.writer.content.PostDocument
@@ -36,13 +37,13 @@ class PostRepository @Inject constructor(
             return
         }
         val matter = PostFrontMatter(
-            title = "欢迎",
-            description = "在手机上写的第一篇草稿。",
+            title = Copy["seed_title"],
+            description = Copy["seed_description"],
             pubDate = LocalDate.now().toString(),
-            tags = listOf("写作"),
+            tags = listOf(Copy["app_name"]),
             draft = true,
         )
-        val body = "# 欢迎\n\n这是一篇本地草稿。长按正文，或点底部的 ✦，可以要三个续写方向。接受之前，那段文字不会写进文件。\n"
+        val body = Copy["seed_body"]
         write(PostDocument(postPath("welcome", drafts = true), matter, body), dirty = true)
     }
 
@@ -65,7 +66,7 @@ class PostRepository @Inject constructor(
     }
 
     suspend fun read(path: String): PostDocument {
-        val text = files.read(path) ?: error("找不到 $path")
+        val text = files.read(path) ?: error(Copy.format("post_missing", "path" to path))
         return FrontMatterCodec.decode(path, text)
     }
 
@@ -91,13 +92,13 @@ class PostRepository @Inject constructor(
         val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now())
         val slug = "note-$stamp"
         val matter = PostFrontMatter(
-            title = "未命名",
+            title = Copy["untitled"],
             description = "",
             pubDate = LocalDate.now().toString(),
             draft = true,
         )
         val path = postPath(slug, drafts = true)
-        write(PostDocument(path, matter, "# 未命名\n\n"), dirty = true)
+        write(PostDocument(path, matter, "# ${Copy["untitled"]}\n\n"), dirty = true)
         return path
     }
 
@@ -190,7 +191,7 @@ class PostRepository @Inject constructor(
         return PostEntity(
             path = path,
             slug = slug,
-            title = frontMatter.title.ifBlank { "未命名" },
+            title = frontMatter.title.ifBlank { Copy["untitled"] },
             description = frontMatter.description,
             draft = frontMatter.draft,
             publishBlog = frontMatter.publish.blog,

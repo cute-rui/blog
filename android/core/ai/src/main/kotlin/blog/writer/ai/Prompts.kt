@@ -1,5 +1,7 @@
 package blog.writer.ai
 
+import blog.writer.copy.Copy
+
 object Prompts {
     val version: Int = load("prompts/version.txt").trim().toInt()
     val system: String = load("prompts/system.txt").trim()
@@ -47,5 +49,5 @@ object Prompts {
     }
 
     private fun load(path: String): String =
-        checkNotNull(Prompts::class.java.classLoader.getResource(path)) { "缺少 $path" }.readText()
+        checkNotNull(Prompts::class.java.classLoader.getResource(path)) { Copy.format("prompt_resource_missing", "path" to path) }.readText()
 }

@@ -1,5 +1,7 @@
 package blog.writer.content
 
+import blog.writer.copy.Copy
+
 sealed interface YamlValue {
     data class Text(val value: String) : YamlValue
     data class Bool(val value: Boolean) : YamlValue
@@ -64,12 +66,12 @@ private class YamlParser(private val lines: List<String>) {
             val current = indentOf(raw)
             if (current < indent) break
             if (current > indent) {
-                throw FrontMatterException("YAML 缩进无法解析：${raw.trim()}")
+                throw FrontMatterException(Copy.format("yaml_indent", "line" to raw.trim()))
             }
             val trimmed = raw.trim()
             if (trimmed.startsWith("- ")) break
             val colon = trimmed.indexOf(':')
-            if (colon <= 0) throw FrontMatterException("YAML 行无法解析：$trimmed")
+            if (colon <= 0) throw FrontMatterException(Copy.format("yaml_line", "line" to trimmed))
             val key = trimmed.substring(0, colon).trim()
             val rest = trimmed.substring(colon + 1).trim()
             index++

@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 data class LlmPreset(
     val id: String,
@@ -17,7 +18,7 @@ data class LlmPreset(
 object LlmPresets {
     val deepSeek = preset(
         id = "deepseek",
-        name = "DeepSeek",
+        name = Copy["preset_deepseek"],
         baseUrl = "https://api.deepseek.com",
         model = "deepseek-chat",
         domestic = true,
@@ -26,7 +27,7 @@ object LlmPresets {
     )
     val qwen = preset(
         id = "qwen",
-        name = "通义千问（阿里云百炼）",
+        name = Copy["preset_qwen"],
         baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
         model = "qwen-plus",
         domestic = true,
@@ -35,7 +36,7 @@ object LlmPresets {
     )
     val kimi = preset(
         id = "kimi",
-        name = "Kimi（Moonshot）",
+        name = Copy["preset_kimi"],
         baseUrl = "https://api.moonshot.cn/v1",
         model = "kimi-k2",
         domestic = true,
@@ -44,7 +45,7 @@ object LlmPresets {
     )
     val glm = preset(
         id = "glm",
-        name = "智谱 GLM",
+        name = Copy["preset_glm"],
         baseUrl = "https://open.bigmodel.cn/api/paas/v4",
         model = "glm-4.5",
         domestic = true,
@@ -53,7 +54,7 @@ object LlmPresets {
     )
     val doubao = preset(
         id = "doubao",
-        name = "豆包（火山方舟）",
+        name = Copy["preset_doubao"],
         baseUrl = "https://ark.cn-beijing.volces.com/api/v3",
         model = "doubao-seed-1-6",
         domestic = true,
@@ -62,7 +63,7 @@ object LlmPresets {
     )
     val siliconFlow = preset(
         id = "siliconflow",
-        name = "硅基流动",
+        name = Copy["preset_siliconflow"],
         baseUrl = "https://api.siliconflow.cn/v1",
         model = "deepseek-ai/DeepSeek-V3",
         domestic = true,
@@ -71,7 +72,7 @@ object LlmPresets {
     )
     val openAi = preset(
         id = "openai",
-        name = "OpenAI",
+        name = Copy["preset_openai"],
         baseUrl = "https://api.openai.com/v1",
         model = "gpt-4.1-mini",
         domestic = false,
@@ -80,7 +81,7 @@ object LlmPresets {
     )
     val anthropic = LlmPreset(
         id = "anthropic",
-        name = "Anthropic",
+        name = Copy["anthropic"],
         protocol = LlmProtocol.Anthropic,
         baseUrl = "https://api.anthropic.com",
         defaultModel = "claude-sonnet-4-5",
@@ -90,7 +91,7 @@ object LlmPresets {
     )
     val gemini = LlmPreset(
         id = "gemini",
-        name = "Google Gemini",
+        name = Copy["preset_gemini"],
         protocol = LlmProtocol.Gemini,
         baseUrl = "https://generativelanguage.googleapis.com",
         defaultModel = "gemini-2.5-flash",
@@ -100,7 +101,7 @@ object LlmPresets {
     )
     val openRouter = preset(
         id = "openrouter",
-        name = "OpenRouter",
+        name = Copy["preset_openrouter"],
         baseUrl = "https://openrouter.ai/api/v1",
         model = "deepseek/deepseek-chat",
         domestic = false,
@@ -109,7 +110,7 @@ object LlmPresets {
     )
     val custom = LlmPreset(
         id = "custom",
-        name = "自定义",
+        name = Copy["custom"],
         protocol = LlmProtocol.OpenAiCompatible,
         baseUrl = "",
         defaultModel = "",

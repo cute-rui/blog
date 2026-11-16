@@ -1,4 +1,5 @@
 package blog.writer.crypto
+import blog.writer.copy.Copy
 
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -37,8 +38,8 @@ class AesGcmCredentialCipher(
     }
 
     override fun decrypt(payload: ByteArray, aad: ByteArray): ByteArray {
-        require(payload.size > 1 + IV_BYTES) { "凭据数据太短" }
-        require(payload[0] == VERSION) { "不认识的凭据版本" }
+        require(payload.size > 1 + IV_BYTES) { Copy["credential_short"] }
+        require(payload[0] == VERSION) { Copy["credential_version"] }
         val iv = payload.copyOfRange(1, 1 + IV_BYTES)
         val encrypted = payload.copyOfRange(1 + IV_BYTES, payload.size)
         val cipher = Cipher.getInstance(TRANSFORMATION)

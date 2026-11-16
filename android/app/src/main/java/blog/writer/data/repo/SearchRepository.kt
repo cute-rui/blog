@@ -1,6 +1,7 @@
 package blog.writer.data.repo
 
 import blog.writer.ai.ActionAssignments
+import blog.writer.copy.Copy
 import blog.writer.ai.LlmClients
 import blog.writer.ai.LlmEndpoint
 import blog.writer.ai.LlmEvent
@@ -92,7 +93,7 @@ class SearchRepository @Inject constructor(
     }
 
     suspend fun mcpHandshake(id: String): McpHandshake {
-        val entity = dao.searchProfile(id) ?: throw IllegalStateException("找不到这个搜索来源")
+        val entity = dao.searchProfile(id) ?: throw IllegalStateException(Copy["search_source_missing"])
         return McpClient(http).handshake(entity.baseUrl, authOf(entity))
     }
 
@@ -197,7 +198,7 @@ class SearchRepository @Inject constructor(
                 val endpoint = llm.endpoint(entity.cleanupProfileId, profile.model) ?: return@ToolTextOrganizer emptyList()
                 val answer = complete(
                     endpoint,
-                    "把下面工具返回的文本整理成 JSON 数组，每项含 title、url、snippet。只能使用文本里原样出现的网址。\n\n$text",
+                    Copy.format("search_organize_prompt", "text" to text),
                 )
                 McpResults.parseOrganizer(answer)
             }
@@ -233,10 +234,11 @@ class SearchRepository @Inject constructor(
         family: SearchCitationFamily,
         model: String,
     ): SearchProfile {
-        val adapter = builtinAdapter(endpoint, family, model, 5, "fact-builtin:${profile.id}", "${profile.name} 内置联网")
+        val builtinName = Copy.format("builtin_model_title", "name" to profile.name)
+        val adapter = builtinAdapter(endpoint, family, model, 5, "fact-builtin:${profile.id}", builtinName)
         return SearchProfile(
             id = "fact-builtin:${profile.id}",
-            name = "${profile.name} 内置联网",
+            name = builtinName,
             kind = SearchSourceKind.MODEL_BUILTIN,
             host = hostOfUrl(endpoint.baseUrl).ifBlank { profile.name },
             enabled = true,
@@ -298,7 +300,7 @@ class SearchRepository @Inject constructor(
     private suspend fun complete(endpoint: LlmEndpoint, user: String): String {
         val text = StringBuilder()
         clients.create(endpoint).stream(
-            LlmRequest(endpoint.model, "你是检索结果整理器。", user, 0.1, 1024, endpoint.stream, false),
+            LlmRequest(endpoint.model, Copy["search_organizer_role"], user, 0.1, 1024, endpoint.stream, false),
         ).collect { event ->
             when (event) {
                 is LlmEvent.TextDelta -> text.append(event.text)

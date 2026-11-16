@@ -1,4 +1,5 @@
 package blog.writer.ui.search
+import blog.writer.copy.Copy
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -96,9 +97,9 @@ fun SearchListScreen(
     val factFamily = factProfile?.let { CitationFamily.from(it.presetId, it.protocol) }
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text("搜索来源", style = MaterialTheme.typography.headlineSmall)
-            Text("自动模式按此顺序尝试 · 点上移或下移调整优先级", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
+            Text(Copy["row_search"], style = MaterialTheme.typography.headlineSmall)
+            Text(Copy["search_order_hint"], color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             profiles.forEachIndexed { index, profile ->
                 Column(Modifier.fillMaxWidth().alpha(if (profile.enabled) 1f else 0.5f).padding(vertical = 6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -108,16 +109,20 @@ fun SearchListScreen(
                     }
                     Text(sourceLine(profile), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        "${if (profile.needsInternational) "需要国际网络" else "国内直连"} · ${profile.testSummary ?: "未测试"}",
+                        Copy.format(
+                            "search_network_line",
+                            "network" to if (profile.needsInternational) Copy["needs_international"] else Copy["domestic_direct"],
+                            "summary" to (profile.testSummary ?: Copy["untested"]),
+                        ),
                         color = if (profile.lastTestFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Row {
-                        TextButton(onClick = { onEdit(profile.id) }) { Text("编辑") }
-                        TextButton(onClick = { model.moveToFront(profile.id) }) { Text("移到最前") }
-                        TextButton(onClick = { model.move(profile.id, -1) }) { Text("上移") }
-                        TextButton(onClick = { model.move(profile.id, 1) }) { Text("下移") }
-                        TextButton(onClick = { model.delete(profile.id) }) { Text("删除") }
+                        TextButton(onClick = { onEdit(profile.id) }) { Text(Copy["edit"]) }
+                        TextButton(onClick = { model.moveToFront(profile.id) }) { Text(Copy["move_front"]) }
+                        TextButton(onClick = { model.move(profile.id, -1) }) { Text(Copy["move_up"]) }
+                        TextButton(onClick = { model.move(profile.id, 1) }) { Text(Copy["move_down"]) }
+                        TextButton(onClick = { model.delete(profile.id) }) { Text(Copy["delete"]) }
                     }
                 }
             }
@@ -129,23 +134,23 @@ fun SearchListScreen(
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("✦", color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(end = 8.dp))
-                            Text("${factProfile.name} 内置联网", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                            Text(Copy["assist_mark"], color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(end = 8.dp))
+                            Text(Copy.format("builtin_model_title", "name" to factProfile.name), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                             Switch(checked = assignments.factUseBuiltin, onCheckedChange = model::toggleBuiltin)
                         }
-                        Text("核查所用模型，自动加入候选，排在最后", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("摘录不完整", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                        Text(Copy["builtin_model_detail"], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(Copy["excerpt_incomplete"], style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
                 }
             }
-            Button(onClick = { picking = !picking }, modifier = Modifier.fillMaxWidth()) { Text("新建搜索来源") }
+            Button(onClick = { picking = !picking }, modifier = Modifier.fillMaxWidth()) { Text(Copy["new_search_source"]) }
             if (picking) {
-                TypeChoice("内置服务", "填 key 就能用：博查、智谱、Tavily、Brave…") { onCreate("builtin") }
-                TypeChoice("自定义 HTTP", "任何返回 JSON 的搜索接口，用模板接入") { onCreate("custom") }
-                TypeChoice("MCP 服务器", "远程 MCP 服务器上的搜索工具") { onCreate("mcp") }
-                TypeChoice("模型内置联网", "用支持联网的 LLM 配置档检索") { onCreate("model") }
+                TypeChoice(Copy["search_kind_builtin"], Copy["search_kind_builtin_detail"]) { onCreate("builtin") }
+                TypeChoice(Copy["search_kind_custom"], Copy["search_kind_custom_detail"]) { onCreate("custom") }
+                TypeChoice(Copy["search_kind_mcp"], Copy["search_kind_mcp_detail"]) { onCreate("mcp") }
+                TypeChoice(Copy["search_kind_model"], Copy["search_kind_model_detail"]) { onCreate("model") }
             }
-            TextButton(onClick = model::restore) { Text("恢复默认顺序") }
+            TextButton(onClick = model::restore) { Text(Copy["restore_order"]) }
         }
     }
 }
@@ -179,10 +184,10 @@ class SearchEditViewModel @Inject constructor(
     )
     var name by mutableStateOf(
         when (kind) {
-            "custom" -> "我的搜索"
-            "mcp" -> "MCP 服务器"
-            "model" -> "模型内置联网"
-            else -> "博查"
+            "custom" -> Copy["search_name_custom"]
+            "mcp" -> Copy["search_kind_mcp"]
+            "model" -> Copy["search_kind_model"]
+            else -> Copy["search_name_default"]
         },
     )
     var service by mutableStateOf(BuiltinSearchService.BOCHA.name)
@@ -276,7 +281,7 @@ class SearchEditViewModel @Inject constructor(
     fun bindLlm(profile: LlmProfileEntity) {
         llmProfileId = profile.id
         boundModel = profile.model
-        if (name.isBlank() || name == "模型内置联网") name = "${profile.name} 内置联网"
+        if (name.isBlank() || name == Copy["search_kind_model"]) name = Copy.format("builtin_model_title", "name" to profile.name)
         CitationFamily.from(profile.presetId, profile.protocol)?.let { international = it.needsInternationalNetwork }
     }
 
@@ -301,9 +306,17 @@ class SearchEditViewModel @Inject constructor(
             if (handshake != null) {
                 mcpTools = handshake.tools
                 if (mcpTool.isBlank()) handshake.tools.firstOrNull { it.looksLikeSearch }?.let(::selectTool)
-                report = "initialize ✓ ${handshake.serverName} ${handshake.serverVersion} · 工具 ${handshake.tools.size}"
+                report = Copy.format(
+                    "initialize_ok",
+                    "name" to handshake.serverName,
+                    "version" to handshake.serverVersion,
+                    "count" to handshake.tools.size,
+                )
             } else {
-                report = "连接失败 · ${result.exceptionOrNull()?.message ?: "initialize 失败"}"
+                report = Copy.format(
+                    "initialize_failed",
+                    "reason" to (result.exceptionOrNull()?.message ?: Copy["initialize_failed_reason"]),
+                )
             }
             testing = false
         }
@@ -316,21 +329,21 @@ class SearchEditViewModel @Inject constructor(
             val handshake = if (kind == "mcp") runCatching { search.mcpHandshake(id) }.getOrNull() else null
             handshake?.let { mcpTools = it.tools }
             val runtime = search.runtime(id)
-            val result = runCatching { runtime?.adapter?.search(SearchRequest("Kotlin 2.0 发布日期", maxResults = 3)) }
+            val result = runCatching { runtime?.adapter?.search(SearchRequest(Copy["search_test_query"], maxResults = 3)) }
             val response = result.getOrNull()
             lastRaw = response?.rawBody
             val summary = if (response != null && response.results.isNotEmpty()) {
                 val dated = response.results.count { it.publishedAt != null }
                 val body = response.results.count { !it.content.isNullOrBlank() }
                 val extra = listOfNotNull(
-                    handshake?.let { "initialize ✓ ${it.serverName} ${it.serverVersion}" },
+                    handshake?.let { Copy.format("initialize_brief", "name" to it.serverName, "version" to it.serverVersion) },
                     response.detail,
                 ).joinToString(" · ")
                 val suffix = if (extra.isBlank()) "" else " · $extra"
-                "测试通过 · 日期 $dated/${response.results.size} · 正文 $body/${response.results.size}$suffix"
+                Copy.format("test_passed", "dated" to dated, "total" to response.results.size, "body" to body, "suffix" to suffix)
             } else {
-                val reason = result.exceptionOrNull()?.message ?: if (runtime == null) "这个来源还不能用" else "没有结果"
-                "测试失败 · $reason"
+                val reason = result.exceptionOrNull()?.message ?: if (runtime == null) Copy["source_unusable"] else Copy["no_results"]
+                Copy.format("test_failed", "reason" to reason)
             }
             report = summary
             lastTestFailed = response == null || response.results.isEmpty()
@@ -350,12 +363,12 @@ class SearchEditViewModel @Inject constructor(
                 !JsonPath.readText(item, fields["url"]).isNullOrBlank()
             }
         }
-        report = "重新映射 · $count 条 · 未重新请求"
+        report = Copy.format("remap_done", "count" to count)
     }
 
     private fun entity(): SearchProfileEntity = SearchProfileEntity(
         id = id,
-        name = name.ifBlank { "搜索来源" },
+        name = name.ifBlank { Copy["row_search"] },
         kind = kind,
         service = if (kind == "builtin") service else kind,
         baseUrl = baseUrl,
@@ -402,16 +415,16 @@ fun SearchEditScreen(
     var showRaw by remember { mutableStateOf(false) }
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = onBack) { Text("返回") }
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
             Text(kindLabel(model.kind), style = MaterialTheme.typography.titleMedium)
-            Text("类型 · ${kindLabel(model.kind)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(model.name, { model.name = it }, label = { Text("名称") }, modifier = Modifier.fillMaxWidth())
+            Text(Copy.format("search_type_line", "kind" to kindLabel(model.kind)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(model.name, { model.name = it }, label = { Text(Copy["field_name"]) }, modifier = Modifier.fillMaxWidth())
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("启用", modifier = Modifier.weight(1f))
+                Text(Copy["enabled"], modifier = Modifier.weight(1f))
                 Switch(checked = model.enabled, onCheckedChange = { model.enabled = it })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (model.international) "需要国际网络" else "国内直连", modifier = Modifier.weight(1f))
+                Text(if (model.international) Copy["needs_international"] else Copy["domestic_direct"], modifier = Modifier.weight(1f))
                 Switch(checked = model.international, onCheckedChange = { model.international = it })
             }
             when (model.kind) {
@@ -423,8 +436,8 @@ fun SearchEditScreen(
             model.report?.let { Text(it) }
             if (model.lastRaw != null && (model.kind == "custom" || model.kind == "mcp")) {
                 Row {
-                    TextButton(onClick = { showRaw = !showRaw }) { Text(if (showRaw) "收起原始响应" else "原始响应") }
-                    TextButton(onClick = model::remap) { Text("重新映射") }
+                    TextButton(onClick = { showRaw = !showRaw }) { Text(if (showRaw) Copy["hide_raw"] else Copy["show_raw"]) }
+                    TextButton(onClick = model::remap) { Text(Copy["remap"]) }
                 }
             }
             if (showRaw) {
@@ -435,8 +448,8 @@ fun SearchEditScreen(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = model::test, enabled = !model.testing) { Text(if (model.testing) "停止" else "连接测试") }
-                Button(onClick = { model.save(onBack) }) { Text("保存") }
+                OutlinedButton(onClick = model::test, enabled = !model.testing) { Text(if (model.testing) Copy["stop"] else Copy["connection_test"]) }
+                Button(onClick = { model.save(onBack) }) { Text(Copy["save"]) }
             }
         }
     }
@@ -444,14 +457,14 @@ fun SearchEditScreen(
 
 @Composable
 private fun BuiltinFields(model: SearchEditViewModel) {
-    Text("服务")
-    Text("国内直连", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    Text(Copy["search_service_heading"])
+    Text(Copy["domestic_direct"], style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
     ServiceChips(model, BuiltinSearchService.entries.filter { it.domesticDirect && it != BuiltinSearchService.SEARXNG })
-    Text("需要国际网络", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    Text(Copy["needs_international"], style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
     ServiceChips(model, BuiltinSearchService.entries.filter { !it.domesticDirect })
-    Text("自建", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    Text(Copy["search_self_hosted"], style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
     ServiceChips(model, listOf(BuiltinSearchService.SEARXNG))
-    OutlinedTextField(model.baseUrl, { model.baseUrl = it }, label = { Text("接口地址") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.baseUrl, { model.baseUrl = it }, label = { Text(Copy["field_endpoint"]) }, modifier = Modifier.fillMaxWidth())
     if (model.service != BuiltinSearchService.SEARXNG.name) {
         KeyField(model)
     }
@@ -469,46 +482,46 @@ private fun ServiceChips(model: SearchEditViewModel, services: List<BuiltinSearc
 @Composable
 private fun CustomFields(model: SearchEditViewModel) {
     KeyField(model)
-    OutlinedTextField(model.method, { model.method = it }, label = { Text("方法") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(model.urlTemplate, { model.urlTemplate = it }, label = { Text("URL 模板") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(model.headersText, { model.headersText = it }, label = { Text("请求头模板") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(model.bodyTemplate, { model.bodyTemplate = it }, label = { Text("请求体模板") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
-    OutlinedTextField(model.itemsPath, { model.itemsPath = it }, label = { Text("结果数组路径") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(model.fieldsText, { model.fieldsText = it }, label = { Text("字段映射") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
-    Text("title 和 url 必填。密钥写 {{secret.名称}}，不会导出。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    OutlinedTextField(model.method, { model.method = it }, label = { Text(Copy["field_method"]) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.urlTemplate, { model.urlTemplate = it }, label = { Text(Copy["field_url_template"]) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.headersText, { model.headersText = it }, label = { Text(Copy["field_header_template"]) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.bodyTemplate, { model.bodyTemplate = it }, label = { Text(Copy["field_body_template"]) }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+    OutlinedTextField(model.itemsPath, { model.itemsPath = it }, label = { Text(Copy["field_items_path"]) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.fieldsText, { model.fieldsText = it }, label = { Text(Copy["field_mapping"]) }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+    Text(Copy["mapping_hint"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
 private fun McpFields(model: SearchEditViewModel) {
-    OutlinedTextField(model.baseUrl, { model.baseUrl = it }, label = { Text("服务器地址") }, modifier = Modifier.fillMaxWidth())
-    Text("认证方式")
+    OutlinedTextField(model.baseUrl, { model.baseUrl = it }, label = { Text(Copy["field_server"]) }, modifier = Modifier.fillMaxWidth())
+    Text(Copy["auth_method"])
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("none" to "无", "bearer" to "Bearer 令牌", "headers" to "自定义请求头").forEach { (id, label) ->
+        listOf("none" to Copy["auth_none"], "bearer" to Copy["auth_bearer"], "headers" to Copy["auth_headers"]).forEach { (id, label) ->
             FilterChip(selected = model.mcpAuth == id, onClick = { model.mcpAuth = id }, label = { Text(label) })
         }
     }
-    if (model.mcpAuth == "bearer") KeyField(model, "Bearer 令牌")
+    if (model.mcpAuth == "bearer") KeyField(model, Copy["auth_bearer"])
     if (model.mcpAuth == "headers") {
         OutlinedTextField(
             model.headersText,
             { model.headersText = it },
-            label = { Text("自定义请求头") },
+            label = { Text(Copy["auth_headers"]) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2,
         )
-        Text("一行一个，名称=值。保存后值只留在本机。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(Copy["header_lines_hint"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     OutlinedButton(onClick = model::listTools, enabled = !model.testing && model.baseUrl.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-        Text("连接并列出工具")
+        Text(Copy["list_tools"])
     }
     if (model.mcpTools.isNotEmpty()) {
-        Text("工具")
+        Text(Copy["tools"])
         model.mcpTools.forEach { tool ->
             FilterChip(
                 selected = model.mcpTool == tool.name,
                 onClick = { model.selectTool(tool) },
                 label = {
-                    Text(if (tool.looksLikeSearch) "${tool.name} · 像搜索" else tool.name)
+                    Text(if (tool.looksLikeSearch) Copy.format("tool_looks_like_search", "name" to tool.name) else tool.name)
                 },
             )
             if (tool.description.isNotBlank()) {
@@ -516,31 +529,31 @@ private fun McpFields(model: SearchEditViewModel) {
             }
         }
     }
-    OutlinedTextField(model.mcpParamMap, { model.mcpParamMap = it }, label = { Text("参数映射") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-    OutlinedTextField(model.itemsPath, { model.itemsPath = it }, label = { Text("结果数组路径") }, supportingText = { Text("可留空，走自动解析") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(model.fieldsText, { model.fieldsText = it }, label = { Text("结果映射") }, supportingText = { Text("可留空，走自动解析") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+    OutlinedTextField(model.mcpParamMap, { model.mcpParamMap = it }, label = { Text(Copy["field_param_map"]) }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+    OutlinedTextField(model.itemsPath, { model.itemsPath = it }, label = { Text(Copy["field_items_path"]) }, supportingText = { Text(Copy["items_path_optional"]) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.fieldsText, { model.fieldsText = it }, label = { Text(Copy["field_result_map"]) }, supportingText = { Text(Copy["items_path_optional"]) }, modifier = Modifier.fillMaxWidth(), minLines = 2)
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("用模型整理结果", modifier = Modifier.weight(1f))
+        Text(Copy["organize_with_model"], modifier = Modifier.weight(1f))
         Switch(checked = model.useModelCleanup, onCheckedChange = { model.useModelCleanup = it })
     }
-    Text("每个网址都必须原样出现在工具返回的文本里，否则丢弃。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(Copy["url_must_appear"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     if (model.useModelCleanup) {
         LlmChips(model.allLlm, model.cleanupProfileId) { model.cleanupProfileId = it.id }
     }
-    Text("只调用所选的这一个工具；发送给服务器的只有检索词，不含文章正文。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(Copy["mcp_query_only"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
 private fun ModelFields(model: SearchEditViewModel, onOpenLlm: () -> Unit) {
     if (model.llmChoices.isEmpty()) {
-        Text("还没有支持内置联网检索的 LLM 配置档")
-        OutlinedButton(onClick = onOpenLlm, modifier = Modifier.fillMaxWidth()) { Text("去新建配置档") }
+        Text(Copy["no_builtin_llm"])
+        OutlinedButton(onClick = onOpenLlm, modifier = Modifier.fillMaxWidth()) { Text(Copy["create_profile"]) }
         return
     }
-    Text("绑定的 LLM 配置档")
+    Text(Copy["bound_llm"])
     LlmChips(model.llmChoices, model.llmProfileId) { model.bindLlm(it) }
-    OutlinedTextField(model.boundModel, { model.boundModel = it }, label = { Text("模型") }, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(model.maxCitations, { model.maxCitations = it }, label = { Text("每次最多取几条引用") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.boundModel, { model.boundModel = it }, label = { Text(Copy["field_model"]) }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(model.maxCitations, { model.maxCitations = it }, label = { Text(Copy["max_citations"]) }, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
@@ -553,27 +566,27 @@ private fun LlmChips(profiles: List<LlmProfileEntity>, selected: String, onPick:
 }
 
 @Composable
-private fun KeyField(model: SearchEditViewModel, label: String = "API key") {
+private fun KeyField(model: SearchEditViewModel, label: String = Copy["api_key"]) {
     OutlinedTextField(
         model.apiKey,
         { model.apiKey = it },
-        label = { Text(if (model.savedLast4 != null) "$label · 末 4 位 ${model.savedLast4}" else label) },
+        label = { Text(if (model.savedLast4 != null) Copy.format("secret_last4", "label" to label, "last4" to model.savedLast4) else label) },
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth(),
     )
 }
 
 private fun kindLabel(kind: String): String = when (kind) {
-    "custom" -> "自定义 HTTP"
-    "mcp" -> "MCP 服务器"
-    "model" -> "模型内置联网"
-    else -> "内置服务"
+    "custom" -> Copy["search_kind_custom"]
+    "mcp" -> Copy["search_kind_mcp"]
+    "model" -> Copy["search_kind_model"]
+    else -> Copy["search_kind_builtin"]
 }
 
 private fun sourceLine(profile: SearchProfileEntity): String {
     val detail = when (profile.kind) {
         "mcp" -> profile.mcpTool.ifBlank { profile.baseUrl.substringAfter("://").substringBefore("/") }
-        "model" -> profile.boundModel.ifBlank { "未绑定" }
+        "model" -> profile.boundModel.ifBlank { Copy["unbound_model"] }
         "custom" -> profile.urlTemplate.substringAfter("://").substringBefore("/").substringBefore("?")
         else -> BuiltinSearchService.entries.firstOrNull { it.name == profile.service }?.label ?: profile.service
     }

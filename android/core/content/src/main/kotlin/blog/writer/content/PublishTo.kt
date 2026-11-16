@@ -1,4 +1,5 @@
 package blog.writer.content
+import blog.writer.copy.Copy
 
 data class PublishSelection(
     val blog: Boolean,
@@ -36,7 +37,7 @@ fun effectiveTargets(defaults: PublishTargets, trailer: PublishSelection?): Publ
 }
 
 fun commitMessage(summary: String, selection: PublishSelection): String {
-    val head = summary.trim().ifEmpty { "更新文章" }
+    val head = summary.trim().ifEmpty { Copy["commit_default"] }
     return "$head\n\nPublish-To: ${selection.token()}\n"
 }
 

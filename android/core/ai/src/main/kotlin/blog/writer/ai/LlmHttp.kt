@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -51,7 +52,7 @@ internal fun OkHttpClient.sse(request: Request, firstTokenMs: Long): Flow<SseEve
                     close(HttpCallException(status, raw))
                     return
                 }
-                close(t ?: IOException("连接中断"))
+                close(t ?: IOException(Copy["connection_closed"]))
             }
         },
     )
@@ -91,12 +92,12 @@ internal fun Flow<LlmEvent>.retryingNetwork(): Flow<LlmEvent> = flow {
 
 internal fun Throwable.toLlmError(): LlmError = when (this) {
     is HttpCallException -> LlmError.Http(status, explainHttpStatus(status), raw.take(2_000))
-    is FirstTokenTimeoutException -> LlmError.Network("首字超时", NetKind.FirstToken)
-    is UnknownHostException -> LlmError.Network("域名无法解析", NetKind.Dns)
-    is SSLException -> LlmError.Network("证书校验失败", NetKind.Tls)
-    is SocketTimeoutException -> LlmError.Network("连接超时", NetKind.Connect)
-    is IOException -> LlmError.Network(message ?: "网络错误", NetKind.Other)
-    else -> LlmError.Protocol(message ?: "无法读取模型返回")
+    is FirstTokenTimeoutException -> LlmError.Network(Copy["first_token_timeout"], NetKind.FirstToken)
+    is UnknownHostException -> LlmError.Network(Copy["dns_failed"], NetKind.Dns)
+    is SSLException -> LlmError.Network(Copy["tls_failed"], NetKind.Tls)
+    is SocketTimeoutException -> LlmError.Network(Copy["connect_timeout"], NetKind.Connect)
+    is IOException -> LlmError.Network(message ?: Copy["network_error"], NetKind.Other)
+    else -> LlmError.Protocol(message ?: Copy["read_model_failed"])
 }
 
 internal fun Request.Builder.withExtra(headers: Map<String, String>): Request.Builder {

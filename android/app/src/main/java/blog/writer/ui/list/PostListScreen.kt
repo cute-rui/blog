@@ -1,4 +1,5 @@
 package blog.writer.ui.list
+import blog.writer.copy.Copy
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -47,7 +48,14 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
-private enum class PostFilter(val label: String) { All("全部"), Drafts("草稿"), Published("已发布"), Unsynced("未同步") }
+private enum class PostFilter { All, Drafts, Published, Unsynced }
+
+private fun PostFilter.label(): String = when (this) {
+    PostFilter.All -> blog.writer.copy.Copy["filter_all"]
+    PostFilter.Drafts -> blog.writer.copy.Copy["draft"]
+    PostFilter.Published -> blog.writer.copy.Copy["filter_published"]
+    PostFilter.Unsynced -> blog.writer.copy.Copy["filter_unsynced"]
+}
 
 @HiltViewModel
 class PostListViewModel @Inject constructor(
@@ -93,7 +101,7 @@ fun PostListScreen(
             FloatingActionButton(
                 onClick = { model.create(onOpen) },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ) { Text("新文章", modifier = Modifier.padding(horizontal = 16.dp)) }
+            ) { Text(Copy["new_post"], modifier = Modifier.padding(horizontal = 16.dp)) }
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
@@ -108,18 +116,18 @@ fun PostListScreen(
             ) {
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("文章", style = MaterialTheme.typography.headlineSmall)
-                        Text("设置", color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable(onClick = onSettings).padding(8.dp))
+                        Text(Copy["article"], style = MaterialTheme.typography.headlineSmall)
+                        Text(Copy["settings"], color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable(onClick = onSettings).padding(8.dp))
                     }
                     Text(syncing.message, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
                         PostFilter.entries.forEach { entry ->
-                            FilterChip(selected = filter == entry, onClick = { filter = entry }, label = { Text(entry.label) })
+                            FilterChip(selected = filter == entry, onClick = { filter = entry }, label = { Text(entry.label()) })
                         }
                     }
                 }
                 if (shown.isEmpty()) {
-                    item { Text("还没有文章。点右下角写一篇。", modifier = Modifier.padding(top = 32.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    item { Text(Copy["empty_posts"], modifier = Modifier.padding(top = 32.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 items(shown, key = { it.path }) { post ->
                     PostRow(post, onClick = { onOpen(post.path) })
@@ -145,12 +153,12 @@ private fun PostRow(post: PostEntity, onClick: () -> Unit) {
             Text(post.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${relativeTime(post.updatedAtEpochMs)} · ${formatCount(post.wordCount)} 字", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (post.draft) SuggestionChip(onClick = {}, label = { Text("草稿") })
-            if (!post.draft && post.publishBlog) SuggestionChip(onClick = {}, label = { Text("博客") })
-            if (!post.draft && post.publishWechat) SuggestionChip(onClick = {}, label = { Text("公众号") })
+            Text(Copy.format("list_meta", "time" to relativeTime(post.updatedAtEpochMs), "count" to formatCount(post.wordCount)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (post.draft) SuggestionChip(onClick = {}, label = { Text(Copy["draft"]) })
+            if (!post.draft && post.publishBlog) SuggestionChip(onClick = {}, label = { Text(Copy["blog"]) })
+            if (!post.draft && post.publishWechat) SuggestionChip(onClick = {}, label = { Text(Copy["wechat"]) })
             if (post.pending) {
-                SuggestionChip(onClick = {}, label = { Text("✦ 待审", color = MaterialTheme.colorScheme.tertiary) })
+                SuggestionChip(onClick = {}, label = { Text(Copy["chip_pending"], color = MaterialTheme.colorScheme.tertiary) })
             }
         }
     }
@@ -162,9 +170,9 @@ private fun relativeTime(epochMs: Long): String {
     val then = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault())
     val minutes = ChronoUnit.MINUTES.between(then, java.time.ZonedDateTime.now())
     return when {
-        minutes < 1 -> "刚刚"
-        minutes < 60 -> "$minutes 分钟前"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前"
-        else -> "${minutes / (60 * 24)} 天前"
+        minutes < 1 -> Copy["just_now"]
+        minutes < 60 -> Copy.format("minutes_ago", "count" to minutes)
+        minutes < 60 * 24 -> Copy.format("hours_ago", "count" to minutes / 60)
+        else -> Copy.format("days_ago", "count" to minutes / (60 * 24))
     }
 }

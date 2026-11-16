@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 import kotlinx.coroutines.flow.Flow
 
@@ -64,11 +65,11 @@ interface LlmProvider {
 }
 
 fun explainHttpStatus(status: Int): String = when (status) {
-    401 -> "key 错误或已失效"
-    403 -> "无权限"
-    404 -> "地址或模型名错"
-    429 -> "被限流，稍后再试"
-    else -> "请求失败"
+    401 -> Copy["http_key_invalid"]
+    403 -> Copy["http_forbidden"]
+    404 -> Copy["http_not_found_model"]
+    429 -> Copy["http_rate_limited"]
+    else -> Copy["http_failed"]
 }
 
 fun shouldRetryLlm(error: Throwable, attempt: Int): Boolean = when {
@@ -81,19 +82,19 @@ fun shouldRetryLlm(error: Throwable, attempt: Int): Boolean = when {
 
 class HttpCallException(val status: Int, val raw: String) : RuntimeException(explainHttpStatus(status))
 
-class FirstTokenTimeoutException : java.io.IOException("首字超时")
+class FirstTokenTimeoutException : java.io.IOException(Copy["first_token_timeout"])
 
 fun validateBaseUrl(url: String, allowHttp: Boolean): String? {
     val trimmed = url.trim()
     val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
-        ?: return "必须以 https:// 开头；局域网网关可在高级选项里允许 http://"
+        ?: return Copy["base_url_https"]
     val scheme = uri.scheme?.lowercase()
     val host = uri.host
-    if (host.isNullOrBlank()) return "必须以 https:// 开头；局域网网关可在高级选项里允许 http://"
+    if (host.isNullOrBlank()) return Copy["base_url_https"]
     return when (scheme) {
         "https" -> null
-        "http" -> if (allowHttp) null else "必须以 https:// 开头；局域网网关可在高级选项里允许 http://"
-        else -> "必须以 https:// 开头；局域网网关可在高级选项里允许 http://"
+        "http" -> if (allowHttp) null else Copy["base_url_https"]
+        else -> Copy["base_url_https"]
     }
 }
 

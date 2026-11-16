@@ -1,4 +1,5 @@
 package blog.writer.sync
+import blog.writer.copy.Copy
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -56,9 +57,9 @@ object WechatCopy {
     fun metaUrl(pageUrl: String): String = pageUrl.trimEnd('/') + "/meta.json"
 
     fun decide(localHash: String?, pageHash: String?): CopyDecision = when {
-        localHash.isNullOrBlank() -> CopyDecision.Waiting("还没有这次发布的内容指纹")
-        pageHash.isNullOrBlank() -> CopyDecision.Waiting("复制页还没有内容指纹")
-        localHash != pageHash -> CopyDecision.Waiting("复制页还是上一版，等待构建完成")
+        localHash.isNullOrBlank() -> CopyDecision.Waiting(Copy["copy_hash_missing"])
+        pageHash.isNullOrBlank() -> CopyDecision.Waiting(Copy["copy_page_hash_missing"])
+        localHash != pageHash -> CopyDecision.Waiting(Copy["copy_page_stale"])
         else -> CopyDecision.Ready
     }
 

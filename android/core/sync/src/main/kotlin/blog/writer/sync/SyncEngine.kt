@@ -1,4 +1,5 @@
 package blog.writer.sync
+import blog.writer.copy.Copy
 
 fun planPull(
     remoteFiles: List<RemoteFile>,
@@ -18,7 +19,7 @@ fun planPull(
                 else -> PullAction.DeleteLocal(path)
             }
             localFile != null && remoteFile != null -> classifyBoth(localFile, remoteFile)
-            else -> error("路径 $path 不在任何一边")
+            else -> error(Copy.format("path_on_neither_side", "path" to path))
         }
     }
     return actions
@@ -64,7 +65,7 @@ class SyncEngine {
         val head = try {
             api.head(request.branch)
         } catch (error: GitHubException) {
-            return PushResult.Failed(error.message ?: "读取分支失败")
+            return PushResult.Failed(error.message ?: Copy["read_branch_failed"])
         }
         if (head != request.baseCommitSha) return PushResult.RemoteMoved(head)
         return try {
@@ -84,7 +85,7 @@ class SyncEngine {
                 is RefUpdate.Rejected -> PushResult.RemoteMoved(update.currentSha)
             }
         } catch (error: GitHubException) {
-            PushResult.Failed(error.message ?: "提交失败")
+            PushResult.Failed(error.message ?: Copy["commit_failed"])
         }
     }
 }

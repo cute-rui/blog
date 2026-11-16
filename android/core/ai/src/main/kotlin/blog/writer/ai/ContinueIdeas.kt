@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -27,7 +28,7 @@ class IdeaStreamParser {
 
 fun parseContinueIdeas(raw: String): List<ContinueIdea> {
     val objects = extractIdeaObjects(raw)
-    if (objects.isEmpty()) throw IllegalArgumentException("没有 JSON 数组")
+    if (objects.isEmpty()) throw IllegalArgumentException(Copy["json_missing_array"])
     return objects
 }
 

@@ -1,4 +1,5 @@
 package blog.writer.ui.editor
+import blog.writer.copy.Copy
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -143,20 +144,20 @@ fun EditorScreen(
     }
     LaunchedEffect(ui.message) {
         val message = ui.message ?: return@LaunchedEffect
-        val result = snackbar.showSnackbar(message, actionLabel = if (message == "已接受" || message == "已丢弃") "撤销" else null)
+        val result = snackbar.showSnackbar(message, actionLabel = if (message == Copy["accepted"] || message == Copy["discarded"]) Copy["undo"] else null)
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) model.undoMessage()
         model.clearMessage()
     }
     if (ui.askDraft) {
         AlertDialog(
             onDismissRequest = model::dismissDraftPrompt,
-            title = { Text("先处理当前草稿？") },
-            text = { Text("还有一段 AI 草稿待审。") },
-            confirmButton = { TextButton(onClick = { model.accept(); model.dismissDraftPrompt() }) { Text("接受") } },
+            title = { Text(Copy["handle_draft_title"]) },
+            text = { Text(Copy["handle_draft_body"]) },
+            confirmButton = { TextButton(onClick = { model.accept(); model.dismissDraftPrompt() }) { Text(Copy["accept"]) } },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { model.reject(); model.dismissDraftPrompt() }) { Text("丢弃") }
-                    TextButton(onClick = model::dismissDraftPrompt) { Text("取消") }
+                    TextButton(onClick = { model.reject(); model.dismissDraftPrompt() }) { Text(Copy["discard"]) }
+                    TextButton(onClick = model::dismissDraftPrompt) { Text(Copy["cancel"]) }
                 }
             },
         )
@@ -167,8 +168,8 @@ fun EditorScreen(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 EditorTopBar(
-                    path = ui.path.ifBlank { "草稿" },
-                    syncLabel = if (sync.syncing) "同步中…" else if (ui.pending != null) "1 处待审" else sync.message,
+                    path = ui.path.ifBlank { Copy["draft"] },
+                    syncLabel = if (sync.syncing) Copy["syncing"] else if (ui.pending != null) Copy["pending_one"] else sync.message,
                     pending = ui.pending != null,
                     onBack = onBack,
                     onPreview = { onPreview(ui.path) },
@@ -236,13 +237,22 @@ fun EditorScreen(
                 ) {
                     if (ui.opening != null || ui.ending != null) {
                         Text(
-                            "开头 ${if (ui.opening != null) "已标" else "未标"} · 结尾 ${if (ui.ending != null) "已标" else "未标"}",
+                            Copy.format(
+                                "opening_ending",
+                                "opening" to if (ui.opening != null) Copy["marked"] else Copy["unmarked"],
+                                "ending" to if (ui.ending != null) Copy["marked"] else Copy["unmarked"],
+                            ),
                             color = MaterialTheme.colorScheme.tertiary,
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
                     Text(
-                        "${if (ui.matter.draft) "草稿" else "文章"} · ${ui.wordCount} 字 · ${ui.savedLabel}",
+                        Copy.format(
+                            "doc_status",
+                            "kind" to if (ui.matter.draft) Copy["draft"] else Copy["article"],
+                            "count" to ui.wordCount,
+                            "saved" to ui.savedLabel,
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
@@ -339,7 +349,7 @@ fun EditorScreen(
                     ideas = false
                 },
                 onCopy = {
-                    scope.launch { snackbar.showSnackbar("已复制方向") }
+                    scope.launch { snackbar.showSnackbar(Copy["copied_direction"]) }
                 },
                 onRetry = { model.startIdeas(state.selection.start, extra) },
                 onSettings = { ideas = false; onSettings() },
@@ -360,7 +370,7 @@ fun EditorScreen(
                 model.publish(blog, wechat) { note ->
                     scope.launch {
                         if (appearance.haptics) {
-                            val type = if (note.contains("失败") || note.contains("冲突")) HapticFeedbackType.Reject else HapticFeedbackType.Confirm
+                            val type = if (note.contains(Copy["fact_attempt_failed"]) || note.contains(Copy["conflict_word"])) HapticFeedbackType.Reject else HapticFeedbackType.Confirm
                             haptic.performHapticFeedback(type)
                         }
                         snackbar.showSnackbar(note)
@@ -388,7 +398,7 @@ private fun EditorTopBar(
         Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = onBack) { Text("返回") }
+        TextButton(onClick = onBack) { Text(Copy["back"]) }
         Text(
             path.substringAfterLast('/').ifBlank { path },
             modifier = Modifier.weight(1f),
@@ -401,8 +411,8 @@ private fun EditorTopBar(
             color = if (pending) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
-        TextButton(onClick = onPreview) { Text("预览") }
-        FilledTonalButton(onClick = onPublish, modifier = Modifier.padding(start = 4.dp)) { Text("发布") }
+        TextButton(onClick = onPreview) { Text(Copy["preview"]) }
+        FilledTonalButton(onClick = onPublish, modifier = Modifier.padding(start = 4.dp)) { Text(Copy["publish"]) }
     }
 }
 
@@ -425,12 +435,13 @@ private fun MarkdownBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        listOf("H" to "# ", "B" to "**", "I" to "*").forEach { (label, marker) ->
-            TextButton(onClick = { if (label == "H") onPrefix("# ") else onMark(marker) }) { Text(label) }
+        val heading = Copy["mark_h"]
+        listOf(heading to "# ", Copy["mark_b"] to "**", Copy["mark_i"] to "*").forEach { (label, marker) ->
+            TextButton(onClick = { if (label == heading) onPrefix("# ") else onMark(marker) }) { Text(label) }
         }
-        TextButton(onClick = onLink) { Text("链接") }
-        TextButton(onClick = { onPrefix("> ") }) { Text("引用") }
-        TextButton(onClick = onImage) { Text("图片") }
+        TextButton(onClick = onLink) { Text(Copy["link"]) }
+        TextButton(onClick = { onPrefix("> ") }) { Text(Copy["quote"]) }
+        TextButton(onClick = onImage) { Text(Copy["image"]) }
         Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Surface(
@@ -440,7 +451,7 @@ private fun MarkdownBar(
             modifier = Modifier.height(44.dp),
         ) {
             Box(Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                Text("✦", color = MaterialTheme.colorScheme.tertiary)
+                Text(Copy["assist_mark"], color = MaterialTheme.colorScheme.tertiary)
             }
         }
     }
@@ -467,20 +478,20 @@ private fun AiMenu(
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("✦ 写作助手", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
-                Text("光标处", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(Copy["assist_title"], color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
+                Text(Copy["cursor_here"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            ActionRow("给我思路", "3 个方向，各附一段示范，由你挑", recommended = !recommendFact && !fillReady, enabled = true, onClick = onContinue)
+            ActionRow(Copy["action_continue"], Copy["action_continue_detail"], recommended = !recommendFact && !fillReady, enabled = true, onClick = onContinue)
             ActionRow(
-                "事实核查",
-                if (recommendFact) "逐条核对陈述并附来源 · 选区" else "逐条核对陈述并附来源 · 本段",
+                Copy["action_fact"],
+                if (recommendFact) Copy["action_fact_selection"] else Copy["action_fact_paragraph"],
                 recommended = recommendFact,
                 enabled = true,
                 onClick = onFact,
             )
             ActionRow(
-                "补全中间",
-                if (fillReady) "用你的开头和结尾补出中间" else "需先标出开头和结尾，或在空行写 <!-- fill -->",
+                Copy["action_fill"],
+                if (fillReady) Copy["action_fill_ready"] else Copy["action_fill_need"],
                 recommended = fillReady,
                 enabled = fillReady,
                 onClick = { if (fillReady) onFill() else onFill() },
@@ -489,12 +500,12 @@ private fun AiMenu(
                 value = extra,
                 onValueChange = onExtra,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("补充要求（可选）") },
+                placeholder = { Text(Copy["extra_placeholder"]) },
                 singleLine = true,
             )
             Row {
-                TextButton(onClick = onOpening) { Text("设为开头") }
-                TextButton(onClick = onEnding) { Text("设为结尾") }
+                TextButton(onClick = onOpening) { Text(Copy["set_opening"]) }
+                TextButton(onClick = onEnding) { Text(Copy["set_ending"]) }
             }
         }
     }
@@ -511,7 +522,7 @@ private fun ActionRow(title: String, detail: String, recommended: Boolean, enabl
             .padding(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("✦", color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(top = 2.dp))
+        Text(Copy["assist_mark"], color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(top = 2.dp))
         Column {
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(detail, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -535,17 +546,17 @@ private fun ContinueSheet(
         Modifier.fillMaxWidth().heightIn(min = 280.dp).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("继续写的 3 个方向", style = MaterialTheme.typography.titleMedium)
-        Text("基于前后文与大纲 · 插入前不会改动正文", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(Copy["continue_title"], style = MaterialTheme.typography.titleMedium)
+        Text(Copy["continue_hint"], style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (needProfile) {
-            Text("还没有设置模型")
-            Button(onClick = onSettings) { Text("去设置") }
+            Text(Copy["no_model"])
+            Button(onClick = onSettings) { Text(Copy["go_settings"]) }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         ideas.forEachIndexed { index, idea ->
             Surface(shape = MaterialTheme.shapes.large, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("方向 ${index + 1}", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
+                    Text(Copy.format("direction_n", "index" to index + 1), color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelSmall)
                     Text(idea.direction, style = MaterialTheme.typography.titleSmall)
                     Text(
                         idea.sample,
@@ -556,8 +567,8 @@ private fun ContinueSheet(
                         TextButton(onClick = {
                             clipboard.setText(AnnotatedString(idea.direction))
                             onCopy()
-                        }) { Text("复制方向") }
-                        FilledTonalButton(onClick = { onInsert(idea.sample) }) { Text("插入示范段") }
+                        }) { Text(Copy["copy_direction"]) }
+                        FilledTonalButton(onClick = { onInsert(idea.sample) }) { Text(Copy["insert_sample"]) }
                     }
                 }
             }
@@ -567,7 +578,7 @@ private fun ContinueSheet(
                 Box(Modifier.fillMaxWidth().height(88.dp).background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large))
             }
         }
-        if (!needProfile) TextButton(onClick = onRetry) { Text("换一批") }
+        if (!needProfile) TextButton(onClick = onRetry) { Text(Copy["retry_batch"]) }
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -581,14 +592,14 @@ private fun ReviewBar(words: Int, generating: Boolean, onStop: () -> Unit, onRej
         shadowElevation = 8.dp,
     ) {
         Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(if (generating) "生成中…" else "$words 字", style = MaterialTheme.typography.labelMedium)
+            Text(if (generating) Copy["generating"] else Copy.format("word_count", "count" to words), style = MaterialTheme.typography.labelMedium)
             Row {
-                if (generating) TextButton(onClick = onStop) { Text("停止") }
-                TextButton(onClick = onReject) { Text("丢弃") }
+                if (generating) TextButton(onClick = onStop) { Text(Copy["stop"]) }
+                TextButton(onClick = onReject) { Text(Copy["discard"]) }
                 Button(
                     onClick = onAccept,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary),
-                ) { Text("接受") }
+                ) { Text(Copy["accept"]) }
             }
         }
     }
@@ -612,10 +623,10 @@ private fun PublishSheet(
     val issues = checks(blog, wechat)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("发布这篇文章", style = MaterialTheme.typography.titleMedium)
+            Text(Copy["publish_sheet_title"], style = MaterialTheme.typography.titleMedium)
             Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TargetCard("博客", "生成网站上的文章", blog, defaultsBlog, enabled = defaultsBlog) { blog = it }
-            TargetCard("微信公众号", "生成公众号版本，之后由你复制到公众号后台群发", wechat, defaultsWechat, enabled = defaultsWechat) { wechat = it }
+            TargetCard(Copy["blog"], Copy["target_blog_detail"], blog, defaultsBlog, enabled = defaultsBlog) { blog = it }
+            TargetCard(Copy["target_wechat"], Copy["target_wechat_detail"], wechat, defaultsWechat, enabled = defaultsWechat) { wechat = it }
             issues.forEach { issue ->
                 val color = when (issue.severity) {
                     IssueSeverity.Fail -> MaterialTheme.colorScheme.error
@@ -625,9 +636,9 @@ private fun PublishSheet(
                 Text(issue.message, color = color, style = MaterialTheme.typography.labelMedium)
             }
             if (pending) {
-                Text("有 1 处 AI 草稿待审，发布内容不包含它", color = MaterialTheme.colorScheme.tertiary)
+                Text(Copy["pending_excluded"], color = MaterialTheme.colorScheme.tertiary)
             }
-            TextButton(onClick = onInfo) { Text("文章信息") }
+            TextButton(onClick = onInfo) { Text(Copy["article_info"]) }
             Button(onClick = { onPublish(blog, wechat) }, modifier = Modifier.fillMaxWidth()) {
                 Text(label(blog, wechat))
             }
@@ -646,7 +657,7 @@ private fun TargetCard(title: String, detail: String, selected: Boolean, isDefau
         Column(Modifier.padding(14.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
-                if (isDefault) Text("默认", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                if (isDefault) Text(Copy["default_label"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
             Text(detail, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -667,18 +678,18 @@ private fun FactSheet(
         Modifier.fillMaxWidth().heightIn(min = 240.dp).verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("事实核查", style = MaterialTheme.typography.titleMedium)
-        if (running) Text("正在找出可核查的陈述…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(Copy["action_fact"], style = MaterialTheme.typography.titleMedium)
+        if (running) Text(Copy["fact_running"], color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (needProfile) {
-            Text("还没有设置模型")
-            Button(onClick = onSettings) { Text("去设置") }
+            Text(Copy["no_model"])
+            Button(onClick = onSettings) { Text(Copy["go_settings"]) }
         }
         if (!running && claims.isEmpty() && unmatched.isEmpty() && !needProfile) {
-            Text("这一段没有可以核实的事实性陈述")
+            Text(Copy["fact_none"])
         }
         claims.forEach { claim -> ClaimCard(claim, onInsert, onCite) }
         unmatched.forEach { claim ->
-            Text("未对上原文：${claim.claim}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(Copy.format("fact_unmatched", "claim" to claim.claim), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.height(12.dp))
     }
@@ -699,24 +710,24 @@ private fun ClaimCard(
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(claim.label, color = color, style = MaterialTheme.typography.labelLarge)
             if (claim.claim.isNotBlank()) {
-                Text("「${claim.claim}」", style = MaterialTheme.typography.bodyMedium.copy(fontFamily = SerifSc))
+                Text(Copy.format("quoted_claim", "claim" to claim.claim), style = MaterialTheme.typography.bodyMedium.copy(fontFamily = SerifSc))
             }
             if (claim.reason.isNotBlank()) Text(claim.reason, style = MaterialTheme.typography.bodySmall)
             if (claim.label == FactCheckRules.RETRIEVAL_FAILED) {
-                Text("没有用来源记忆做判定。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(Copy["fact_no_memory"], style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             claim.results.forEach { result ->
                 val sources = listOf(result.origin.profileName) + result.origin.alsoFrom
                 Text("${result.rank}. ${result.title}", style = MaterialTheme.typography.labelMedium)
                 Text(
-                    "来自 ${sources.filter { it.isNotBlank() }.joinToString("、")}" + if (result.incompleteExcerpt) " · 摘录不完整" else "",
+                    Copy.format("fact_from", "sources" to sources.filter { it.isNotBlank() }.joinToString("、")) + if (result.incompleteExcerpt) Copy["excerpt_incomplete_suffix"] else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(result.url, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { onCite(result.title, result.url) })
             }
             claim.fix?.let { fix ->
-                TextButton(onClick = { onInsert(fix) }) { Text("插入修正") }
+                TextButton(onClick = { onInsert(fix) }) { Text(Copy["insert_fix"]) }
             }
         }
     }
@@ -725,7 +736,7 @@ private fun ClaimCard(
 private fun Modifier.appendAssistMenu(onAssist: () -> Unit): Modifier =
     this.then(
         appendTextContextMenuComponents {
-            item(AssistKey, "✦ 写作助手") {
+            item(AssistKey, Copy["assist_title"]) {
                 close()
                 onAssist()
             }

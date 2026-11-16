@@ -1,10 +1,11 @@
 package blog.writer.content
+import blog.writer.copy.Copy
 
 object FrontMatterCodec {
     fun decode(path: String, source: String): PostDocument {
         val (yaml, body) = split(source)
         val matter = if (yaml == null) {
-            PostFrontMatter(title = "未命名", draft = true)
+            PostFrontMatter(title = Copy["untitled"], draft = true)
         } else {
             readMatter(parseYamlMap(yaml))
         }

@@ -1,4 +1,5 @@
 package blog.writer.search
+import blog.writer.copy.Copy
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -51,7 +52,7 @@ class SearchRouter(
                 emptyList(),
                 emptyList(),
                 failedAll = true,
-                warnings = listOf("已达费用上限"),
+                warnings = listOf(Copy["warning_budget"]),
                 ignoredOptions = emptySet(),
                 estimatedCost = spent,
             )
@@ -85,11 +86,11 @@ class SearchRouter(
         val ignored = mutableSetOf<String>()
         for (profile in candidates) {
             if (settings.costCap != null && cost + (profile.unitPrice ?: 0.0) > settings.costCap) {
-                warnings += "已达费用上限"
+                warnings += Copy["warning_budget"]
                 break
             }
             if (!reachable(profile)) {
-                attempts += SearchAttempt(profile.id, profile.name, "当前不可达")
+                attempts += SearchAttempt(profile.id, profile.name, Copy["warning_unreachable"])
                 continue
             }
             val outcome = runOne(profile, request, settings)
@@ -102,7 +103,7 @@ class SearchRouter(
                 return RoutedSearch(outcome.results, attempts, false, warnings, ignored, cost)
             }
             memory.recordFailure(profile.id, now())
-            attempts += SearchAttempt(profile.id, profile.name, outcome.failure ?: "0 条结果")
+            attempts += SearchAttempt(profile.id, profile.name, outcome.failure ?: Copy["warning_zero_results"])
         }
         return RoutedSearch(emptyList(), attempts, true, warnings, ignored, cost)
     }
@@ -123,11 +124,11 @@ class SearchRouter(
             if (chosen.size >= limit) break
             val price = profile.unitPrice ?: 0.0
             if (settings.costCap != null && cost + price > settings.costCap) {
-                warnings += "已达费用上限"
+                warnings += Copy["warning_budget"]
                 break
             }
             if (!reachable(profile)) {
-                attempts += SearchAttempt(profile.id, profile.name, "当前不可达")
+                attempts += SearchAttempt(profile.id, profile.name, Copy["warning_unreachable"])
                 continue
             }
             chosen += profile
@@ -146,7 +147,7 @@ class SearchRouter(
                 attempts += SearchAttempt(profile.id, profile.name, null)
             } else {
                 memory.recordFailure(profile.id, now())
-                attempts += SearchAttempt(profile.id, profile.name, outcome.failure ?: "0 条结果")
+                attempts += SearchAttempt(profile.id, profile.name, outcome.failure ?: Copy["warning_zero_results"])
             }
         }
         val merged = SearchNormalizer.mergeSources(listOf(pieces), settings.preferredDomains)
@@ -179,7 +180,7 @@ class SearchRouter(
             }
             OneShot(normalized.results, null, response.ignoredOptions, response.warnings)
         } catch (error: SearchException) {
-            OneShot(emptyList(), error.message ?: "检索失败", emptySet(), emptyList())
+            OneShot(emptyList(), error.message ?: Copy["search_failed"], emptySet(), emptyList())
         }
     }
 

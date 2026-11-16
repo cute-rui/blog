@@ -1,4 +1,5 @@
 package blog.writer.ui.preview
+import blog.writer.copy.Copy
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -61,9 +62,9 @@ class PreviewViewModel @Inject constructor(
     private val drafts: WechatDraftSync,
 ) : ViewModel() {
     private val path = decodePath(savedStateHandle.get<String>("path").orEmpty())
-    val note = MutableStateFlow("公众号预览使用 md2wx。")
+    val note = MutableStateFlow(Copy["note_using_md2wx"])
     val html = MutableStateFlow("")
-    val mode = MutableStateFlow("公众号")
+    val mode = MutableStateFlow(Copy["wechat"])
     val hasDraft = MutableStateFlow(false)
     private val sending = AtomicBoolean(false)
 
@@ -74,7 +75,7 @@ class PreviewViewModel @Inject constructor(
 
     fun showWechat() {
         viewModelScope.launch {
-            mode.value = "公众号"
+            mode.value = Copy["wechat"]
             val document = posts.read(path)
             val rendered = runCatching {
                 renderer.render(
@@ -85,12 +86,13 @@ class PreviewViewModel @Inject constructor(
             }
             rendered.fold(
                 onSuccess = { result ->
-                    html.value = "<html><body style=\"background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px\">${result.htmlFragment}<p>图片 ${result.images.size} · ${result.length.characters} 字符</p></body></html>"
-                    note.value = "公众号预览"
+                    val caption = Copy.format("preview_image_count", "count" to result.images.size, "chars" to result.length.characters)
+                    html.value = "<html><body style=\"background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px\">${result.htmlFragment}<p>$caption</p></body></html>"
+                    note.value = Copy["note_wechat"]
                 },
                 onFailure = { error ->
                     html.value = ""
-                    note.value = error.message ?: "md2wx 没有渲染"
+                    note.value = error.message ?: Copy["note_render_failed"]
                 },
             )
         }
@@ -104,7 +106,7 @@ class PreviewViewModel @Inject constructor(
                 result.fold(
                     onSuccess = { sent ->
                         hasDraft.value = true
-                        onResult(if (sent.updated) "已更新草稿箱里的这一篇" else "已放入草稿箱")
+                        onResult(if (sent.updated) Copy["draft_updated"] else Copy["draft_added"])
                     },
                     onFailure = { error -> onResult(draftFailure(error)) },
                 )
@@ -116,10 +118,10 @@ class PreviewViewModel @Inject constructor(
 
     fun showBlog() {
         viewModelScope.launch {
-            mode.value = "博客"
+            mode.value = Copy["blog"]
             val document = posts.read(path)
             html.value = blogHtml(document.body)
-            note.value = "这是博客阅读的近似效果，不是公众号 HTML。"
+            note.value = Copy["note_blog"]
         }
     }
 
@@ -127,7 +129,7 @@ class PreviewViewModel @Inject constructor(
         viewModelScope.launch {
             val settings = github.current()
             if (settings.wxIndexUrl.isBlank()) {
-                onResult("还没有配置复制页清单")
+                onResult(Copy["no_copy_index"])
                 return@launch
             }
             val slug = slugOf(path)
@@ -135,7 +137,7 @@ class PreviewViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     val index = WechatCopy.parseIndex(httpGet(settings.wxIndexUrl))
                     github.rememberMode(index.wechatMode)
-                    val page = index.pages[slug] ?: error("清单里没有这篇文章")
+                    val page = index.pages[slug] ?: error(Copy["slug_missing"])
                     val meta = WechatCopy.parseMeta(httpGet(WechatCopy.metaUrl(page)))
                     val html = httpGet(WechatCopy.contentUrl(page))
                     val decision = WechatCopy.decide(posts.contentHash(path), meta.contentHash)
@@ -149,7 +151,7 @@ class PreviewViewModel @Inject constructor(
                         is CopyDecision.Waiting -> onResult(decision.reason)
                     }
                 },
-                onFailure = { onResult(it.message ?: "复制页没有取到") },
+                onFailure = { onResult(it.message ?: Copy["copy_page_failed"]) },
             )
         }
     }
@@ -177,10 +179,10 @@ fun PreviewScreen(
     val context = LocalContext.current
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onBack) { Text("返回") }
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = model::showBlog) { Text(if (mode == "博客") "博客 · 当前" else "博客") }
-                TextButton(onClick = model::showWechat) { Text(if (mode == "公众号") "公众号 · 当前" else "公众号") }
+                TextButton(onClick = model::showBlog) { Text(if (mode == Copy["blog"]) Copy["mode_blog_current"] else Copy["blog"]) }
+                TextButton(onClick = model::showWechat) { Text(if (mode == Copy["wechat"]) Copy["mode_wechat_current"] else Copy["wechat"]) }
             }
             Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (status.isNotBlank()) Text(status, color = MaterialTheme.colorScheme.primary)
@@ -190,32 +192,32 @@ fun PreviewScreen(
                         val page = result.lineSequence().drop(1).first()
                         val body = result.lineSequence().drop(2).joinToString("\n")
                         val clipboard = context.getSystemService(ClipboardManager::class.java)
-                        clipboard.setPrimaryClip(ClipData.newHtmlText("公众号正文", body, body))
+                        clipboard.setPrimaryClip(ClipData.newHtmlText(Copy["clipboard_wechat"], body, body))
                         pageUrl = page
-                        status = "已复制正文"
+                        status = Copy["copied_body"]
                     } else {
                         status = result
                     }
                 }
-            }) { Text("复制公众号格式") }
+            }) { Text(Copy["copy_wechat_format"]) }
             OutlinedButton(onClick = {
                 if (pageUrl.isBlank()) {
-                    status = "还没有复制页链接"
+                    status = Copy["no_copy_link"]
                 } else {
                     context.startActivity(
                         Intent.createChooser(
                             Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, pageUrl),
-                            "把复制页链接发到电脑",
+                            Copy["send_copy_link"],
                         ),
                     )
                 }
-            }) { Text("把复制页链接发到电脑") }
+            }) { Text(Copy["send_copy_link"]) }
             OutlinedButton(onClick = {
-                status = "正在放进草稿箱…"
+                status = Copy["putting_draft"]
                 model.sendDraft { result -> status = result }
-            }) { Text(if (hasDraft) "更新公众号草稿箱里的这一篇" else "放进公众号草稿箱") }
+            }) { Text(if (hasDraft) Copy["update_draft"] else Copy["put_in_drafts"]) }
             Text(
-                "不会群发。放进草稿箱之后，在公众号助手里检查再发。",
+                Copy["no_broadcast"],
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -233,10 +235,10 @@ fun PreviewScreen(
 private fun draftFailure(error: Throwable): String {
     val message = (error as? EgressException)?.message ?: error.message.orEmpty()
     return when {
-        message.contains("出口令牌") || message.contains("WECHAT_EGRESS_TOKEN") -> "先在设置里填写出口令牌"
-        message.contains("SRV") -> "先在设置里填写 SRV 域名"
-        message.contains("libmd2wx") -> "还没有放进 libmd2wx_android.so。复制公众号格式仍读取 CI 生成的复制页。"
-        message.isBlank() -> "没有放进草稿箱"
+        message.contains(Copy["egress_token"]) || message.contains("WECHAT_EGRESS_TOKEN") -> Copy["need_egress_token"]
+        message.contains("SRV") -> Copy["need_srv_domain"]
+        message.contains("libmd2wx") -> Copy["missing_lib_copy_still"]
+        message.isBlank() -> Copy["draft_not_sent"]
         else -> message
     }
 }

@@ -1,4 +1,5 @@
 package blog.writer.ui.settings
+import blog.writer.copy.Copy
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,23 +84,23 @@ fun SettingsScreen(
     val appearance by model.appearanceState.collectAsState(blog.writer.data.repo.Appearance())
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text("设置", style = MaterialTheme.typography.headlineSmall)
-            SettingsRow("AI 模型", "配置档、连接测试、每个动作用哪个模型", onLlm)
-            SettingsRow("搜索来源", "事实核查用的检索配置档", onSearch)
-            SettingsRow("GitHub", "内容仓库、令牌、复制页清单", onGithub)
-            SettingsRow("微信出口", "SRV 域名和出口令牌。手机不保存 AppID", onEgress)
-            Text("外观", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-            ToggleRow("跟随系统配色", appearance.dynamicColor) { model.update { current -> current.copy(dynamicColor = it) } }
-            ToggleRow("触感反馈", appearance.haptics) { model.update { current -> current.copy(haptics = it) } }
-            ToggleRow("正文用宋体", appearance.serif) { model.update { current -> current.copy(serif = it) } }
-            Text("编辑器字号 ${appearance.fontSizeSp.roundToInt()} sp")
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
+            Text(Copy["settings"], style = MaterialTheme.typography.headlineSmall)
+            SettingsRow(Copy["row_llm"], Copy["row_llm_detail"], onLlm)
+            SettingsRow(Copy["row_search"], Copy["row_search_detail"], onSearch)
+            SettingsRow(Copy["github"], Copy["row_github_detail"], onGithub)
+            SettingsRow(Copy["row_egress"], Copy["row_egress_detail"], onEgress)
+            Text(Copy["appearance"], color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+            ToggleRow(Copy["follow_system_color"], appearance.dynamicColor) { model.update { current -> current.copy(dynamicColor = it) } }
+            ToggleRow(Copy["haptics"], appearance.haptics) { model.update { current -> current.copy(haptics = it) } }
+            ToggleRow(Copy["serif_body"], appearance.serif) { model.update { current -> current.copy(serif = it) } }
+            Text(Copy.format("font_size", "size" to appearance.fontSizeSp.roundToInt()))
             Slider(
                 value = appearance.fontSizeSp,
                 onValueChange = { model.update { current -> current.copy(fontSizeSp = it) } },
                 valueRange = 15f..22f,
             )
-            Text("动态配色默认关闭。打开后也只换按钮的黛蓝，纸面和赭石色不变。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(Copy["dynamic_color_note"], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -159,34 +160,34 @@ fun LlmHomeScreen(
     if (confirm) {
         AlertDialog(
             onDismissRequest = model::dismissClear,
-            title = { Text("清除全部凭据？") },
-            text = { Text("API key、GitHub 令牌和微信出口令牌会从这台手机删掉。配置档还在。") },
-            confirmButton = { TextButton(onClick = model::clear) { Text("清除", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = model::dismissClear) { Text("取消") } },
+            title = { Text(Copy["clear_credentials_title"]) },
+            text = { Text(Copy["clear_credentials_body"]) },
+            confirmButton = { TextButton(onClick = model::clear) { Text(Copy["clear"], color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = model::dismissClear) { Text(Copy["cancel"]) } },
         )
     }
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = onBack) { Text("返回") }
-                TextButton(onClick = model::askClear) { Text("清除全部凭据", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onBack) { Text(Copy["back"]) }
+                TextButton(onClick = model::askClear) { Text(Copy["clear_all_credentials"], color = MaterialTheme.colorScheme.error) }
             }
-            Text("AI 模型", style = MaterialTheme.typography.headlineSmall)
+            Text(Copy["row_llm"], style = MaterialTheme.typography.headlineSmall)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("配置档", color = MaterialTheme.colorScheme.primary)
-                TextButton(onClick = onCreate) { Text("新建") }
+                Text(Copy["profiles"], color = MaterialTheme.colorScheme.primary)
+                TextButton(onClick = onCreate) { Text(Copy["new_item"]) }
             }
             profiles.forEach { profile ->
                 ProfileRow(profile, assignments, onClick = { onEdit(profile.id) }, onDelete = { model.delete(profile.id) })
             }
-            if (profiles.isEmpty()) Text("还没有配置档。选一个预设就能测连接。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("AI 动作分配", color = MaterialTheme.colorScheme.primary)
-            AssignmentRow("默认", assignments.defaultProfileId, assignments.defaultModel, profiles) { id, name ->
+            if (profiles.isEmpty()) Text(Copy["no_profiles"], color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(Copy["action_assignment"], color = MaterialTheme.colorScheme.primary)
+            AssignmentRow(Copy["default_label"], assignments.defaultProfileId, assignments.defaultModel, profiles) { id, name ->
                 model.saveAssignments(assignments.copy(defaultProfileId = id, defaultModel = name))
             }
             Text(
-                if (assignments.continueWriting.followDefault) "给我思路继续写 · 跟随默认 · 温度 ${assignments.continueWriting.temperature}"
-                else "给我思路继续写 · ${assignments.continueWriting.model} · 温度 ${assignments.continueWriting.temperature}",
+                if (assignments.continueWriting.followDefault) Copy.format("continue_follow", "temperature" to assignments.continueWriting.temperature)
+                else Copy.format("continue_model", "model" to assignments.continueWriting.model, "temperature" to assignments.continueWriting.temperature),
             )
             TextButton(onClick = {
                 model.saveAssignments(
@@ -194,15 +195,15 @@ fun LlmHomeScreen(
                         continueWriting = assignments.continueWriting.copy(followDefault = !assignments.continueWriting.followDefault),
                     ),
                 )
-            }) { Text(if (assignments.continueWriting.followDefault) "改为指定配置档" else "改为跟随默认") }
+            }) { Text(if (assignments.continueWriting.followDefault) Copy["use_specific_profile"] else Copy["use_default_profile"]) }
             if (!assignments.continueWriting.followDefault && profiles.isNotEmpty()) {
-                AssignmentRow("续写", assignments.continueWriting.profileId, assignments.continueWriting.model, profiles) { id, name ->
+                AssignmentRow(Copy["assignment_continue"], assignments.continueWriting.profileId, assignments.continueWriting.model, profiles) { id, name ->
                     model.saveAssignments(
                         assignments.copy(continueWriting = ModelChoice(id, name, followDefault = false, temperature = assignments.continueWriting.temperature)),
                     )
                 }
             }
-            Text("温度 ${assignments.continueWriting.temperature}")
+            Text(Copy.format("temperature_value", "temperature" to assignments.continueWriting.temperature))
             Slider(
                 value = assignments.continueWriting.temperature.toFloat(),
                 onValueChange = { value ->
@@ -212,13 +213,18 @@ fun LlmHomeScreen(
                 valueRange = 0f..2f,
             )
             Text(
-                "补全中间 · ${if (assignments.fillMiddle.followDefault) "跟随默认" else assignments.fillMiddle.model ?: "未指定"} · 温度 ${assignments.fillMiddle.temperature} · ${assignments.fillTargetWords} 字",
+                Copy.format(
+                    "fill_assignment",
+                    "model" to if (assignments.fillMiddle.followDefault) Copy["follow_default"] else assignments.fillMiddle.model ?: Copy["not_specified"],
+                    "temperature" to assignments.fillMiddle.temperature,
+                    "words" to assignments.fillTargetWords,
+                ),
             )
-            Text("事实核查 · ${if (assignments.factCheck.followDefault) "跟随默认" else assignments.factCheck.model ?: "未指定"} · 温度固定 0.1")
-            Text("检索", style = MaterialTheme.typography.titleSmall)
-            Text("检索方式", style = MaterialTheme.typography.labelMedium)
+            Text(Copy.format("fact_assignment", "model" to if (assignments.factCheck.followDefault) Copy["follow_default"] else assignments.factCheck.model ?: Copy["not_specified"]))
+            Text(Copy["retrieval"], style = MaterialTheme.typography.titleSmall)
+            Text(Copy["retrieval_mode"], style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("AUTO" to "自动", "SINGLE" to "指定一个配置档", "MERGE" to "多源合并").forEach { (id, label) ->
+                listOf("AUTO" to Copy["mode_auto"], "SINGLE" to Copy["mode_single"], "MERGE" to Copy["mode_merge"]).forEach { (id, label) ->
                     FilterChip(
                         selected = assignments.factMode == id,
                         onClick = { model.saveAssignments(assignments.copy(factMode = id)) },
@@ -228,19 +234,19 @@ fun LlmHomeScreen(
             }
             if (assignments.factMode == "MERGE") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("多源合并的来源数 ${assignments.factMergeCount}", modifier = Modifier.weight(1f))
+                    Text(Copy.format("merge_count", "count" to assignments.factMergeCount), modifier = Modifier.weight(1f))
                     TextButton(onClick = {
                         model.saveAssignments(assignments.copy(factMergeCount = (assignments.factMergeCount - 1).coerceAtLeast(2)))
-                    }) { Text("－") }
+                    }) { Text(Copy["minus"]) }
                     TextButton(onClick = {
                         model.saveAssignments(assignments.copy(factMergeCount = (assignments.factMergeCount + 1).coerceAtMost(5)))
-                    }) { Text("＋") }
+                    }) { Text(Copy["plus"]) }
                 }
             }
             if (assignments.factMode == "SINGLE") {
-                Text("指定一个配置档", style = MaterialTheme.typography.labelMedium)
+                Text(Copy["mode_single"], style = MaterialTheme.typography.labelMedium)
                 if (searchProfiles.isEmpty()) {
-                    Text("还没有搜索来源。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text(Copy["no_search_sources"], color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     searchProfiles.forEach { profile ->
@@ -252,24 +258,24 @@ fun LlmHomeScreen(
                     }
                 }
             }
-            Text("AI 历史", color = MaterialTheme.colorScheme.primary)
-            if (history.isEmpty()) Text("还没有记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(Copy["ai_history"], color = MaterialTheme.colorScheme.primary)
+            if (history.isEmpty()) Text(Copy["no_history"], color = MaterialTheme.colorScheme.onSurfaceVariant)
             history.take(8).forEach { entry ->
-                Text("${entry.action} · ${entry.model} · 模板 v${entry.promptVersion}", style = MaterialTheme.typography.bodySmall)
+                Text(Copy.format("history_line", "action" to entry.action, "model" to entry.model, "version" to entry.promptVersion), style = MaterialTheme.typography.bodySmall)
             }
             TextButton(onClick = {
                 model.saveAssignments(assignments.copy(fillMiddle = assignments.fillMiddle.copy(followDefault = !assignments.fillMiddle.followDefault)))
-            }) { Text(if (assignments.fillMiddle.followDefault) "补全中间改为指定配置档" else "补全中间改为跟随默认") }
+            }) { Text(if (assignments.fillMiddle.followDefault) Copy["fill_use_specific"] else Copy["fill_use_default"]) }
             TextButton(onClick = {
                 model.saveAssignments(assignments.copy(factCheck = assignments.factCheck.copy(followDefault = !assignments.factCheck.followDefault)))
-            }) { Text(if (assignments.factCheck.followDefault) "事实核查改为指定配置档" else "事实核查改为跟随默认") }
+            }) { Text(if (assignments.factCheck.followDefault) Copy["fact_use_specific"] else Copy["fact_use_default"]) }
             if (!assignments.fillMiddle.followDefault) {
-                AssignmentRow("补全中间", assignments.fillMiddle.profileId, assignments.fillMiddle.model, profiles) { id, name ->
+                AssignmentRow(Copy["action_fill"], assignments.fillMiddle.profileId, assignments.fillMiddle.model, profiles) { id, name ->
                     model.saveAssignments(assignments.copy(fillMiddle = assignments.fillMiddle.copy(profileId = id, model = name, followDefault = false)))
                 }
             }
             if (!assignments.factCheck.followDefault) {
-                AssignmentRow("事实核查", assignments.factCheck.profileId, assignments.factCheck.model, profiles) { id, name ->
+                AssignmentRow(Copy["action_fact"], assignments.factCheck.profileId, assignments.factCheck.model, profiles) { id, name ->
                     model.saveAssignments(assignments.copy(factCheck = assignments.factCheck.copy(profileId = id, model = name, followDefault = false)))
                 }
             }
@@ -286,10 +292,10 @@ private fun ProfileRow(profile: LlmProfileEntity, assignments: ActionAssignments
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        val test = profile.testSummary ?: "未测试"
+        val test = profile.testSummary ?: Copy["untested"]
         Text(test, style = MaterialTheme.typography.labelMedium, color = if (profile.testOk == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-        if (assignments.defaultProfileId == profile.id) Text("默认", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
-        TextButton(onClick = onDelete) { Text("删除") }
+        if (assignments.defaultProfileId == profile.id) Text(Copy["default_label"], color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+        TextButton(onClick = onDelete) { Text(Copy["delete"]) }
     }
 }
 
@@ -304,7 +310,7 @@ private fun AssignmentRow(
     Text(label)
     profiles.forEach { profile ->
         TextButton(onClick = { onPick(profile.id, profile.model) }) {
-            Text(if (profile.id == selectedId) "已选 ${profile.name} · ${selectedModel ?: profile.model}" else profile.name)
+            Text(if (profile.id == selectedId) Copy.format("selected_profile", "name" to profile.name, "model" to (selectedModel ?: profile.model)) else profile.name)
         }
     }
 }
@@ -316,7 +322,7 @@ class LlmEditViewModel @Inject constructor(
     private val clients: LlmClients,
 ) : ViewModel() {
     val id: String = savedStateHandle.get<String>("id").orEmpty().let { if (it == "new" || it.isBlank()) UUID.randomUUID().toString() else it }
-    var name by mutableStateOf("DeepSeek")
+    var name by mutableStateOf(Copy["preset_deepseek"])
     var presetId by mutableStateOf(LlmPresets.deepSeek.id)
     var protocol by mutableStateOf(LlmProtocol.OpenAiCompatible)
     var baseUrl by mutableStateOf(LlmPresets.deepSeek.baseUrl)
@@ -377,17 +383,27 @@ class LlmEditViewModel @Inject constructor(
             if (urlError != null) return@launch
             val key = keyInput.ifBlank { llm.apiKey(id).orEmpty() }
             if (key.isBlank() || modelName.isBlank()) {
-                report = "先填写模型和 API key"
+                report = Copy["fill_model_first"]
                 return@launch
             }
             testing = true
             val endpoint = LlmEndpoint(protocol, baseUrl.trim(), key, modelName.trim(), stream = stream, jsonOutput = jsonOutput, connectTimeoutSec = 10, firstTokenTimeoutSec = 30, totalTimeoutSec = 60)
             val result = ConnectionTester().test(clients.create(endpoint), endpoint)
             testing = false
+            val dash = Copy["dash"]
             report = if (result.ok) {
-                "连接成功 · 首字 ${result.firstTokenMs ?: "—"} ms · 总耗时 ${result.totalMs ?: "—"} ms · ${result.model ?: modelName}"
+                Copy.format(
+                    "connection_ok",
+                    "first" to (result.firstTokenMs ?: dash),
+                    "total" to (result.totalMs ?: dash),
+                    "model" to (result.model ?: modelName),
+                )
             } else {
-                "连接失败 · ${result.explanation ?: "网络错误"}${result.rawError?.let { "\n$it" }.orEmpty()}"
+                Copy.format(
+                    "connection_failed",
+                    "explanation" to (result.explanation ?: Copy["network_error"]),
+                    "raw" to result.rawError?.let { "\n$it" }.orEmpty(),
+                )
             }
         }
     }
@@ -421,7 +437,7 @@ class LlmEditViewModel @Inject constructor(
                     extraHeadersJson = headersToText(emptyMap()),
                     keyLast4 = keyInput.takeLast(4).ifBlank { savedLast4 },
                     diverged = false,
-                    testOk = report?.startsWith("连接成功"),
+                    testOk = report?.startsWith(Copy["connection_ok"].substringBefore(" ·")),
                     testSummary = report,
                     testAtEpochMs = if (report == null) null else System.currentTimeMillis(),
                 ),
@@ -438,13 +454,13 @@ fun LlmEditScreen(onBack: () -> Unit, model: LlmEditViewModel = hiltViewModel())
     var showPresets by remember { mutableStateOf(false) }
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = onBack) { Text("关闭") }
-            Text(if (model.savedLast4 == null) "新建配置档" else "编辑配置档", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(model.name, { model.name = it }, label = { Text("名称") }, modifier = Modifier.fillMaxWidth())
+            TextButton(onClick = onBack) { Text(Copy["close"]) }
+            Text(if (model.savedLast4 == null) Copy["new_profile"] else Copy["edit_profile"], style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(model.name, { model.name = it }, label = { Text(Copy["field_name"]) }, modifier = Modifier.fillMaxWidth())
             OutlinedButton(onClick = { showPresets = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("预设 · ${LlmPresets.byId(model.presetId)?.name ?: "自定义"}")
+                Text(Copy.format("preset_line", "name" to (LlmPresets.byId(model.presetId)?.name ?: Copy["custom"])))
             }
-            val protocols = listOf(LlmProtocol.OpenAiCompatible to "OpenAI 兼容", LlmProtocol.Anthropic to "Anthropic", LlmProtocol.Gemini to "Gemini")
+            val protocols = listOf(LlmProtocol.OpenAiCompatible to Copy["protocol_openai"], LlmProtocol.Anthropic to Copy["anthropic"], LlmProtocol.Gemini to Copy["protocol_gemini"])
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 protocols.forEachIndexed { index, (value, label) ->
                     SegmentedButton(
@@ -457,7 +473,7 @@ fun LlmEditScreen(onBack: () -> Unit, model: LlmEditViewModel = hiltViewModel())
             OutlinedTextField(
                 model.baseUrl,
                 { model.baseUrl = it; model.urlError = null },
-                label = { Text("接口地址（Base URL）") },
+                label = { Text(Copy["field_base_url"]) },
                 supportingText = { model.urlError?.let { Text(it) } },
                 isError = model.urlError != null,
                 modifier = Modifier.fillMaxWidth(),
@@ -465,55 +481,55 @@ fun LlmEditScreen(onBack: () -> Unit, model: LlmEditViewModel = hiltViewModel())
             OutlinedTextField(
                 value = if (model.keyInput.isEmpty() && model.savedLast4 != null) "" else model.keyInput,
                 onValueChange = { model.keyInput = it },
-                label = { Text(if (model.savedLast4 != null) "API key · 末 4 位 ${model.savedLast4}" else "API key") },
+                label = { Text(if (model.savedLast4 != null) Copy.format("api_key_last4", "last4" to model.savedLast4) else Copy["api_key"]) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(model.modelName, { model.modelName = it }, label = { Text("模型") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(model.modelName, { model.modelName = it }, label = { Text(Copy["field_model"]) }, modifier = Modifier.fillMaxWidth())
             val searchSupported = supportsBuiltinSearch(model.presetId, model.protocol)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = model.stream, onClick = { model.stream = !model.stream }, label = { Text("流式输出") })
-                FilterChip(selected = model.jsonOutput, onClick = { model.jsonOutput = !model.jsonOutput }, label = { Text("JSON 输出") })
+                FilterChip(selected = model.stream, onClick = { model.stream = !model.stream }, label = { Text(Copy["stream_output"]) })
+                FilterChip(selected = model.jsonOutput, onClick = { model.jsonOutput = !model.jsonOutput }, label = { Text(Copy["json_output"]) })
                 FilterChip(
                     selected = searchSupported && model.builtinSearch,
                     onClick = { if (searchSupported) model.builtinSearch = !model.builtinSearch },
                     enabled = searchSupported,
-                    label = { Text("内置联网检索") },
+                    label = { Text(Copy["builtin_search"]) },
                 )
             }
             Text(
-                if (searchSupported) "打开后，事实核查可以把这个配置档的内置检索当作搜索来源。结果只取引用元数据。"
-                else "该预设暂未适配联网检索。",
+                if (searchSupported) Copy["builtin_search_on"]
+                else Copy["builtin_search_unsupported"],
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            ToggleRow("允许 http://", model.allowHttp) { model.allowHttp = it }
-            if (model.allowHttp) Text("仅用于局域网自建网关，key 会以明文传输", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+            ToggleRow(Copy["allow_http"], model.allowHttp) { model.allowHttp = it }
+            if (model.allowHttp) Text(Copy["allow_http_warning"], color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
             model.report?.let { Text(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = model::test, enabled = !model.testing && model.name.isNotBlank() && model.modelName.isNotBlank() && model.baseUrl.isNotBlank()) { Text(if (model.testing) "停止" else "连接测试") }
-                Button(onClick = { model.save(onBack) }, enabled = model.name.isNotBlank() && model.modelName.isNotBlank() && model.baseUrl.isNotBlank()) { Text("保存") }
+                OutlinedButton(onClick = model::test, enabled = !model.testing && model.name.isNotBlank() && model.modelName.isNotBlank() && model.baseUrl.isNotBlank()) { Text(if (model.testing) Copy["stop"] else Copy["connection_test"]) }
+                Button(onClick = { model.save(onBack) }, enabled = model.name.isNotBlank() && model.modelName.isNotBlank() && model.baseUrl.isNotBlank()) { Text(Copy["save"]) }
             }
         }
     }
     if (showPresets) {
         AlertDialog(
             onDismissRequest = { showPresets = false },
-            title = { Text("预设") },
+            title = { Text(Copy["presets_title"]) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text("国内直连", color = MaterialTheme.colorScheme.primary)
+                    Text(Copy["domestic_direct"], color = MaterialTheme.colorScheme.primary)
                     LlmPresets.domestic.forEach { preset ->
                         TextButton(onClick = { model.applyPreset(preset); showPresets = false }) { Text(preset.name) }
                     }
-                    Text("海外", color = MaterialTheme.colorScheme.primary)
+                    Text(Copy["overseas"], color = MaterialTheme.colorScheme.primary)
                     LlmPresets.overseas.forEach { preset ->
                         TextButton(onClick = { model.applyPreset(preset); showPresets = false }) { Text(preset.name) }
                     }
-                    TextButton(onClick = { model.applyPreset(LlmPresets.custom); showPresets = false }) { Text("自定义") }
+                    TextButton(onClick = { model.applyPreset(LlmPresets.custom); showPresets = false }) { Text(Copy["custom"]) }
                 }
             },
-            confirmButton = { TextButton(onClick = { showPresets = false }) { Text("关闭") } },
+            confirmButton = { TextButton(onClick = { showPresets = false }) { Text(Copy["close"]) } },
         )
     }
 }
@@ -567,7 +583,7 @@ class GithubViewModel @Inject constructor(
                 ),
                 newToken = token.ifBlank { null },
             )
-            message = "已保存"
+            message = Copy["saved"]
             last4 = github.tokenLast4()
             token = ""
         }
@@ -578,26 +594,26 @@ class GithubViewModel @Inject constructor(
 fun GithubScreen(onBack: () -> Unit, model: GithubViewModel = hiltViewModel()) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text("GitHub", style = MaterialTheme.typography.headlineSmall)
-            Text("令牌只放在这台手机的 Keystore 里。仓库里不会出现 key。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            GithubField("内容仓库所有者", model.owner) { model.owner = it }
-            GithubField("内容仓库名", model.repo) { model.repo = it }
-            GithubField("分支", model.branch) { model.branch = it }
-            GithubField("博客仓库所有者", model.blogOwner) { model.blogOwner = it }
-            GithubField("博客仓库名", model.blogRepo) { model.blogRepo = it }
-            GithubField("站点地址", model.site) { model.site = it }
-            GithubField("复制页清单 URL", model.wxIndex) { model.wxIndex = it }
-            GithubField("公众号名称", model.wechatName) { model.wechatName = it }
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
+            Text(Copy["github"], style = MaterialTheme.typography.headlineSmall)
+            Text(Copy["github_token_note"], style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            GithubField(Copy["github_owner"], model.owner) { model.owner = it }
+            GithubField(Copy["github_repo"], model.repo) { model.repo = it }
+            GithubField(Copy["github_branch"], model.branch) { model.branch = it }
+            GithubField(Copy["github_blog_owner"], model.blogOwner) { model.blogOwner = it }
+            GithubField(Copy["github_blog_repo"], model.blogRepo) { model.blogRepo = it }
+            GithubField(Copy["github_site"], model.site) { model.site = it }
+            GithubField(Copy["github_wx_index"], model.wxIndex) { model.wxIndex = it }
+            GithubField(Copy["github_wechat_name"], model.wechatName) { model.wechatName = it }
             OutlinedTextField(
                 value = model.token,
                 onValueChange = { model.token = it },
-                label = { Text(if (model.last4 != null) "令牌 · 末 4 位 ${model.last4}" else "细粒度 PAT") },
+                label = { Text(if (model.last4 != null) Copy.format("github_token_last4", "last4" to model.last4) else Copy["github_pat"]) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (model.message.isNotBlank()) Text(model.message)
-            Button(onClick = model::save, modifier = Modifier.fillMaxWidth()) { Text("保存") }
+            Button(onClick = model::save, modifier = Modifier.fillMaxWidth()) { Text(Copy["save"]) }
         }
     }
 }
@@ -613,7 +629,7 @@ private fun supportsBuiltinSearch(presetId: String, protocol: LlmProtocol): Bool
 }
 
 private fun protocolLabel(protocol: String): String = when (protocol) {
-    "anthropic" -> "Anthropic"
-    "gemini" -> "Gemini"
-    else -> "OpenAI 兼容"
+    "anthropic" -> Copy["anthropic"]
+    "gemini" -> Copy["protocol_gemini"]
+    else -> Copy["protocol_openai"]
 }

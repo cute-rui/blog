@@ -1,4 +1,5 @@
 package blog.writer.search
+import blog.writer.copy.Copy
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -246,19 +247,17 @@ class ModelBuiltinSearchAdapter(
             result.copy(rank = index + 1, incompleteExcerpt = short)
         }
         val warnings = normalized.warnings.toMutableList()
-        if (limited.any { it.incompleteExcerpt }) warnings += "摘录不完整"
+        if (limited.any { it.incompleteExcerpt }) warnings += Copy["excerpt_incomplete"]
         val redirectNote = when {
             redirectTried == 0 -> null
-            redirectOk == redirectTried -> "跳转链接解析成功"
-            else -> "跳转链接解析失败"
+            redirectOk == redirectTried -> Copy["redirect_ok"]
+            else -> Copy["redirect_failed"]
         }
         if (redirectNote != null) warnings += redirectNote
         val detail = buildString {
-            append("引用条数 ")
-            append(limited.size)
+            append(Copy.format("citation_count", "count" to limited.size))
             if (redirectTried > 0) {
-                append(" · 跳转链接解析 ")
-                append(if (redirectOk == redirectTried) "✓" else "✕")
+                append(Copy.format("redirect_part", "mark" to if (redirectOk == redirectTried) "✓" else "✕"))
             }
         }
         return normalized.copy(results = limited, warnings = warnings, detail = detail, rawBody = raw.take(4_000))
@@ -383,10 +382,10 @@ class ModelBuiltinSearchAdapter(
     }
 
     private fun explain(status: Int, body: String): String = when (status) {
-        401, 403 -> "key 错误"
-        402 -> "额度用尽"
-        404 -> "地址错"
-        429 -> "被限流"
+        401, 403 -> Copy["key_error"]
+        402 -> Copy["quota_spent"]
+        404 -> Copy["address_wrong"]
+        429 -> Copy["rate_limited"]
         else -> "HTTP $status ${body.take(180)}"
     }
 

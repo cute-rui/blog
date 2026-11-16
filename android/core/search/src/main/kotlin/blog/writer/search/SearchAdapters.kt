@@ -1,4 +1,5 @@
 package blog.writer.search
+import blog.writer.copy.Copy
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -12,19 +13,23 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URI
 
 enum class BuiltinSearchService(
-    val label: String,
+    private val labelKey: String,
     val defaultBaseUrl: String,
     val domesticDirect: Boolean,
 ) {
-    BOCHA("博查 Web Search", "https://api.bochaai.com", true),
-    ZHIPU("智谱 Web Search", "https://open.bigmodel.cn/api/paas/v4", true),
-    QIANFAN("百度千帆 AI 搜索", "https://qianfan.baidubce.com", true),
-    IQS("阿里云 IQS", "https://cloud-iqs.aliyuncs.com", true),
-    TAVILY("Tavily", "https://api.tavily.com", false),
-    BRAVE("Brave Search API", "https://api.search.brave.com", false),
-    EXA("Exa", "https://api.exa.ai", false),
-    SERPER("Serper", "https://google.serper.dev", false),
-    SEARXNG("SearXNG", "", true),
+    BOCHA("search_service_bocha", "https://api.bochaai.com", true),
+    ZHIPU("search_service_zhipu", "https://open.bigmodel.cn/api/paas/v4", true),
+    QIANFAN("search_service_qianfan", "https://qianfan.baidubce.com", true),
+    IQS("search_service_iqs", "https://cloud-iqs.aliyuncs.com", true),
+    TAVILY("search_service_tavily", "https://api.tavily.com", false),
+    BRAVE("search_service_brave", "https://api.search.brave.com", false),
+    EXA("search_service_exa", "https://api.exa.ai", false),
+    SERPER("search_service_serper", "https://google.serper.dev", false),
+    SEARXNG("search_service_searxng", "", true),
+    ;
+
+    val label: String
+        get() = blog.writer.copy.Copy[labelKey]
 }
 
 class BuiltinSearchAdapter(
@@ -153,7 +158,7 @@ class BuiltinSearchAdapter(
     }
 
     private fun searx(request: SearchRequest): List<RawHit> {
-        if (baseUrl.isBlank()) throw SearchException("还没有填写 SearXNG 实例地址")
+        if (baseUrl.isBlank()) throw SearchException(Copy["searx_missing"])
         val url = buildString {
             append(baseUrl.trimEnd('/'))
             append("/search?format=json&q=")
@@ -336,10 +341,10 @@ class BuiltinSearchAdapter(
     }
 
     private fun explain(status: Int, body: String): String = when (status) {
-        401, 403 -> "key 错误"
-        402 -> "额度用尽"
-        404 -> "地址错"
-        429 -> "被限流"
+        401, 403 -> Copy["key_error"]
+        402 -> Copy["quota_spent"]
+        404 -> Copy["address_wrong"]
+        429 -> Copy["rate_limited"]
         else -> "HTTP $status ${body.take(180)}"
     }
 

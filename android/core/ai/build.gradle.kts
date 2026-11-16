@@ -8,6 +8,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:copy"))
     implementation(project(":core:editor"))
     implementation(project(":core:search"))
     implementation(libs.serialization.json)

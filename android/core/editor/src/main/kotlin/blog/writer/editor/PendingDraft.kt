@@ -1,12 +1,13 @@
 package blog.writer.editor
+import blog.writer.copy.Copy
 
 data class PendingSpan(
     val start: Int,
     val endExclusive: Int,
 ) {
     init {
-        require(start >= 0) { "草稿起点不能为负" }
-        require(endExclusive >= start) { "草稿范围颠倒了" }
+        require(start >= 0) { Copy["draft_start_negative"] }
+        require(endExclusive >= start) { Copy["draft_range_reversed"] }
     }
 
     val length: Int get() = endExclusive - start

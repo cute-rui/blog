@@ -1,4 +1,5 @@
 package blog.writer.render
+import blog.writer.copy.Copy
 
 import uniffi.md2wx.RenderOptions
 import uniffi.md2wx.blogTheme
@@ -29,7 +30,7 @@ class Md2wxWechatMarkdownRenderer : WechatMarkdownRenderer {
                 ),
             )
         } catch (error: UnsatisfiedLinkError) {
-            throw IllegalStateException("还没有放进 libmd2wx_android.so", error)
+            throw IllegalStateException(Copy["missing_lib"], error)
         }
     }
 }
