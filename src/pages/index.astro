@@ -4,7 +4,7 @@ import { getPublishedPosts } from '../lib/posts';
 import SidebarLayout from '../layouts/SidebarLayout.astro';
 import PostCard from '../components/PostCard.astro';
 import SectionHeading from '../components/SectionHeading.astro';
-import Seal from '../components/Seal.astro';
+import Logo from '../components/Logo.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 
 const posts = await getPublishedPosts();
@@ -60,7 +60,7 @@ const recent = rest.slice(0, 5);
         >
           {siteConfig.description}
         </p>
-        <Seal size={44} />
+        <Logo size={44} />
       </div>
     </section>
   </Fragment>

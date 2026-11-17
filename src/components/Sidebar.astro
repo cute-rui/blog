@@ -3,7 +3,7 @@ import { siteConfig } from '../site.config';
 import { countTags, groupByYear, type Post } from '../lib/posts';
 import { readingTime } from '../lib/reading-time';
 import { formatWords } from '../lib/format';
-import Seal from './Seal.astro';
+import Logo from './Logo.astro';
 import Tag from './Tag.astro';
 
 type Props = {
@@ -24,7 +24,7 @@ function isExternal(href: string): boolean {
 <aside class="space-y-10 lg:sticky lg:top-24 lg:self-start" aria-label="侧栏">
   <section class="rounded-2xl border border-line bg-surface p-5 shadow-card">
     <div class="flex items-center gap-4">
-      <Seal size={52} />
+      <Logo size={52} />
       <div class="min-w-0">
         <p class="font-serif text-lg font-semibold leading-tight">{siteConfig.author}</p>
         <p class="kicker mt-1 truncate">{siteConfig.title}</p>

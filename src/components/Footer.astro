@@ -1,6 +1,6 @@
 ---
 import { siteConfig } from '../site.config';
-import Seal from './Seal.astro';
+import Logo from './Logo.astro';
 
 const year = new Date().getFullYear();
 
@@ -14,7 +14,7 @@ function isExternal(href: string): boolean {
     <div class="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between">
       <div class="max-w-sm">
         <a href="/" class="inline-flex items-center gap-3">
-          <Seal size={32} />
+          <Logo size={32} />
           <span class="font-serif text-lg font-semibold tracking-tight">{siteConfig.title}</span>
         </a>
         <p class="mt-4 text-sm leading-relaxed text-muted">{siteConfig.description}</p>

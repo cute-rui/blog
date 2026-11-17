@@ -11,6 +11,7 @@ import {
   resolveLocalImage,
   resolvePageKey,
   resolveWechatMode,
+  wechatSourceUrl,
 } from './content.mjs';
 import { transcodeBodyImage, writeCover } from './images.mjs';
 import { lintPosts } from './lint.mjs';
@@ -39,10 +40,7 @@ function applyImageUrls(html, images, urls) {
 }
 
 function sourceUrlOf(post, site) {
-  const specified = post.data.wechat?.sourceUrl;
-  if (typeof specified === 'string' && specified !== '' && specified !== 'auto') return specified;
-  if (post.data.publish.blog === false) return '';
-  return `${site.url}/posts/${encodeURIComponent(post.slug)}/`;
+  return wechatSourceUrl(post, site);
 }
 
 async function writeOnePage({ post, site, tokens, secret, outDir }) {

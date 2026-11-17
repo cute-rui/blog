@@ -9,6 +9,7 @@ import { DEV_PAGE_KEY, hmacPrefix, loadSchema, repoRoot, schemaErrors } from './
 import { lintPosts } from './lib/lint.mjs';
 import { parsePublishTo, preparePublish, slugFromPostsPath } from './lib/prepare-publish.mjs';
 import { renderSummary } from './lib/summary.mjs';
+import { classifyExisting, draftPayload, selectMissing, syncWechatDrafts } from './lib/wechat-sync.mjs';
 import { buildWxPages } from './lib/wx-pages.mjs';
 import { redact, renderTable, runProbe, solidPng } from '../tools/wechat-probe/probe.mjs';
 
@@ -264,3 +265,163 @@ function restoreEnv(name, value) {
 function json(body) {
   return { status: 200, text: async () => JSON.stringify(body) };
 }
+
+function syncCandidate(slug, title, extra = {}) {
+  const post = {
+    slug,
+    ext: '.md',
+    dir: '/tmp/unused',
+    data: {
+      title,
+      description: '摘要',
+      publish: { blog: true, wechat: true },
+      draft: false,
+      ...extra.data,
+    },
+    rendered: extra.rendered ?? { html: '<p>正文</p>', images: [] },
+  };
+  return {
+    post,
+    wx: {
+      title,
+      author: 'lightwing',
+      digest: '摘要',
+      sourceUrl: `https://example.com/posts/${slug}/`,
+      openComment: undefined,
+      fansOnlyComment: undefined,
+      cover: '',
+      coverCrop: null,
+      ...extra.wx,
+    },
+  };
+}
+
+test('wechat sync skips drafts and published articles', () => {
+  const candidates = [
+    syncCandidate('new', '新文章'),
+    syncCandidate('drafted', '已有草稿'),
+    syncCandidate('sent', '已发表'),
+    syncCandidate('renamed', '改过标题', { wx: { title: '改过标题', sourceUrl: 'https://example.com/posts/renamed/' } }),
+  ];
+  const existing = [
+    { where: 'draft', title: '已有草稿', content_source_url: '' },
+    { where: 'published', title: '已发表', content_source_url: 'https://example.com/posts/sent/' },
+    { where: 'published', title: '旧标题', content_source_url: 'https://example.com/posts/renamed' },
+    { where: 'draft', title: '', content_source_url: '' },
+  ];
+  assert.equal(classifyExisting({ title: '', sourceUrl: '' }, existing), null);
+  const { missing, skipped } = selectMissing(candidates, existing);
+  assert.deepEqual(missing.map((item) => item.post.slug), ['new']);
+  assert.deepEqual(
+    skipped.map((item) => [item.post.slug, item.where]),
+    [
+      ['drafted', 'draft'],
+      ['sent', 'published'],
+      ['renamed', 'published'],
+    ],
+  );
+});
+
+test('draft payload stays inside the add-draft JSON shape', () => {
+  const payload = draftPayload(
+    {
+      title: '标题',
+      author: 'lightwing',
+      digest: '摘要',
+      sourceUrl: 'https://example.com/posts/new/',
+      openComment: true,
+      fansOnlyComment: false,
+    },
+    '<p>正文</p>',
+    'thumb123',
+  );
+  assert.deepEqual(payload, {
+    articles: [
+      {
+        title: '标题',
+        content: '<p>正文</p>',
+        author: 'lightwing',
+        digest: '摘要',
+        content_source_url: 'https://example.com/posts/new/',
+        thumb_media_id: 'thumb123',
+        need_open_comment: 1,
+        only_fans_can_comment: 0,
+      },
+    ],
+  });
+});
+
+test('sync adds only articles that are in neither list', async () => {
+  const calls = [];
+  let draft = null;
+  const lists = {
+    'list-drafts': { articles: [{ title: '已有草稿', content_source_url: '', media_id: 'm1', article_id: '' }] },
+    'list-published': { articles: [{ title: '已发表', content_source_url: '', media_id: '', article_id: 'a1' }] },
+  };
+  const run = (args) => {
+    calls.push(args[0]);
+    if (args[0] === 'add-draft') {
+      const file = args[args.indexOf('--file') + 1];
+      draft = JSON.parse(readFileSync(file, 'utf8'));
+      return { code: 0, stdout: '{"media_id":"new-id"}\n', stderr: '' };
+    }
+    return { code: 0, stdout: `${JSON.stringify(lists[args[0]])}\n`, stderr: '' };
+  };
+  const result = await syncWechatDrafts({
+    posts: [syncCandidate('new', '新文章'), syncCandidate('drafted', '已有草稿'), syncCandidate('sent', '已发表')],
+    site: { author: 'lightwing', url: 'https://example.com' },
+    env: { WECHAT_EGRESS_TOKEN: 'token', WECHAT_EGRESS_SRV_HOST: 'example.com' },
+    run,
+    log() {},
+  });
+  assert.deepEqual(calls, ['list-drafts', 'list-published', 'add-draft']);
+  assert.deepEqual(result.added.map((item) => item.slug), ['new']);
+  assert.equal(draft.articles[0].title, '新文章');
+  assert.equal(draft.articles[0].author, 'lightwing');
+  assert.equal(draft.articles[0].content_source_url, 'https://example.com/posts/new/');
+});
+
+test('sync does not call egress when no wechat article needs it', async () => {
+  await syncWechatDrafts({
+    posts: [],
+    site: { author: 'lightwing', url: 'https://example.com' },
+    env: {},
+    run() {
+      throw new Error('should not run');
+    },
+    log() {},
+  });
+});
+
+test('sync fails closed when egress settings are missing', async () => {
+  await assert.rejects(
+    () =>
+      syncWechatDrafts({
+        posts: [syncCandidate('new', '新文章')],
+        site: { author: 'lightwing', url: 'https://example.com' },
+        env: {},
+        run() {
+          throw new Error('should not run');
+        },
+        log() {},
+      }),
+    /WECHAT_EGRESS_TOKEN/,
+  );
+});
+
+test('publish workflow reads the public content repo and does not call WeChat', () => {
+  const files = [
+    '.github/workflows/publish.yml',
+    'scripts/sync-wechat-drafts.mjs',
+    'scripts/lib/wechat-sync.mjs',
+  ].map((file) => readFileSync(path.join(root, file), 'utf8'));
+  for (const text of files) {
+    assert.equal(text.includes('api.weixin.qq.com'), false);
+    assert.equal(text.includes('freepublish/submit'), false);
+    assert.equal(text.includes('message/mass'), false);
+    assert.equal(text.includes('WECHAT_APPID'), false);
+    assert.equal(text.includes('WECHAT_APPSECRET'), false);
+  }
+  assert.match(files[0], /cute-rui\/blog-source/);
+  assert.match(files[0], /list-drafts|sync-wechat-drafts/);
+});

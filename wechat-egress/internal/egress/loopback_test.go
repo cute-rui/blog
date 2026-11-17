@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/binary"
@@ -196,6 +197,26 @@ func TestRejectsBadBearerBeforeUpstream(t *testing.T) {
 	}
 	if fake.calls != 0 {
 		t.Fatalf("upstream calls = %d", fake.calls)
+	}
+}
+
+func TestRealGRPCPathVerifiesCertificates(t *testing.T) {
+	client := &Client{serverName: "egress.example.com"}
+	cfg, err := client.tlsConfig("203.0.113.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.InsecureSkipVerify {
+		t.Fatal("InsecureSkipVerify is set on the real path")
+	}
+	if cfg.MinVersion != tls.VersionTLS12 {
+		t.Fatalf("min version %v", cfg.MinVersion)
+	}
+	if cfg.ServerName != "egress.example.com" {
+		t.Fatalf("server name %q", cfg.ServerName)
+	}
+	if _, err := client.transport("203.0.113.10"); err != nil {
+		t.Fatal(err)
 	}
 }
 

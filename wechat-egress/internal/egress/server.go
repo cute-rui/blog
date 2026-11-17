@@ -248,6 +248,22 @@ func (s *Server) UpdateDraft(ctx context.Context, req *pb.UpdateDraftRequest) (*
 	return &pb.UpdateDraftResponse{}, nil
 }
 
+func (s *Server) ListDrafts(ctx context.Context, _ *pb.ListDraftsRequest) (*pb.ListDraftsResponse, error) {
+	items, err := s.api.ListDrafts(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &pb.ListDraftsResponse{Articles: listedToProto(items)}, nil
+}
+
+func (s *Server) ListPublished(ctx context.Context, _ *pb.ListPublishedRequest) (*pb.ListPublishedResponse, error) {
+	items, err := s.api.ListPublished(ctx)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &pb.ListPublishedResponse{Articles: listedToProto(items)}, nil
+}
+
 func toStatus(err error) error {
 	if err == nil {
 		return nil

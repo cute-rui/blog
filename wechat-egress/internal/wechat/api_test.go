@@ -3,6 +3,7 @@ package wechat
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"image"
 	"image/png"
@@ -290,6 +291,141 @@ func TestWeChatErrorIncludesCode(t *testing.T) {
 	_, _, err := api.StableToken(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "40164") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestListDraftsAndPublishedPaginateWithoutPublishing(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		paths = append(paths, r.URL.Path)
+		if strings.Contains(r.URL.Path, "submit") || strings.Contains(r.URL.Path, "mass") {
+			t.Errorf("forbidden path %s", r.URL.Path)
+		}
+		switch r.URL.Path {
+		case pathStableToken:
+			writeJSON(w, map[string]any{"access_token": "access-token-value", "expires_in": 7200})
+		case pathDraftBatchGet:
+			var req struct {
+				Offset    int `json:"offset"`
+				Count     int `json:"count"`
+				NoContent int `json:"no_content"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil {
+				t.Fatal(err)
+			}
+			if req.Count != 20 || req.NoContent != 1 {
+				t.Fatalf("draft page %+v", req)
+			}
+			if req.Offset == 0 {
+				writeJSON(w, map[string]any{
+					"total_count": 2,
+					"item_count":  1,
+					"item": []any{map[string]any{
+						"media_id": "draft-1",
+						"content": map[string]any{"news_item": []any{map[string]any{
+							"title":              " 草稿标题 ",
+							"content_source_url": "https://example.com/posts/draft/",
+						}}},
+					}},
+				})
+				return
+			}
+			if req.Offset != 1 {
+				t.Fatalf("offset %d", req.Offset)
+			}
+			writeJSON(w, map[string]any{
+				"total_count": 2,
+				"item_count":  1,
+				"item": []any{map[string]any{
+					"media_id": "draft-2",
+					"content":  map[string]any{"news_item": []any{map[string]any{"title": "第二篇"}}},
+				}},
+			})
+		case pathPublishBatchGet:
+			var req struct {
+				NoContent int `json:"no_content"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil {
+				t.Fatal(err)
+			}
+			if req.NoContent != 1 {
+				t.Fatal("published list asked for content")
+			}
+			writeJSON(w, map[string]any{
+				"total_count": 1,
+				"item_count":  1,
+				"item": []any{map[string]any{
+					"article_id": "pub-1",
+					"content": map[string]any{"news_item": []any{map[string]any{
+						"title":              "已发表",
+						"content_source_url": "https://example.com/posts/sent/",
+					}}},
+				}},
+			})
+		default:
+			t.Errorf("path %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	api := newTestAPI(t, srv, nil)
+	drafts, err := api.ListDrafts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(drafts) != 2 || drafts[0].Title != "草稿标题" || drafts[0].MediaID != "draft-1" || drafts[0].ContentSourceURL != "https://example.com/posts/draft/" || drafts[1].Title != "第二篇" {
+		t.Fatalf("drafts %+v", drafts)
+	}
+	published, err := api.ListPublished(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(published) != 1 || published[0].ArticleID != "pub-1" || published[0].Title != "已发表" || published[0].MediaID != "" {
+		t.Fatalf("published %+v", published)
+	}
+	for _, path := range paths {
+		if strings.Contains(path, "submit") || strings.Contains(path, "/message/mass") {
+			t.Fatalf("called %s", path)
+		}
+	}
+}
+
+func TestOfficialClientVerifiesCertificates(t *testing.T) {
+	api, err := New(Config{AppID: "wx-server", Secret: "server-secret-value"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport, ok := api.http.Transport.(*http.Transport)
+	if !ok || transport.TLSClientConfig == nil || transport.TLSClientConfig.InsecureSkipVerify {
+		t.Fatal("official client skips TLS verification")
+	}
+	if transport.TLSClientConfig.MinVersion < tls.VersionTLS12 {
+		t.Fatalf("min version %v", transport.TLSClientConfig.MinVersion)
+	}
+	if transport.Proxy != nil {
+		t.Fatal("proxy is set")
+	}
+
+	badTransport := http.DefaultTransport.(*http.Transport).Clone()
+	badTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	_, err = New(Config{
+		AppID:   "wx-server",
+		Secret:  "server-secret-value",
+		BaseURL: "https://api.weixin.qq.com",
+		HTTP:    &http.Client{Transport: badTransport},
+	})
+	if err == nil || !strings.Contains(err.Error(), "cannot be disabled") {
+		t.Fatalf("error = %v", err)
+	}
+	_, err = New(Config{
+		AppID:   "wx-server",
+		Secret:  "server-secret-value",
+		BaseURL: "https://127.0.0.1:9",
+		HTTP:    &http.Client{Transport: badTransport},
+	})
+	if err != nil {
+		t.Fatalf("loopback skip was rejected: %v", err)
 	}
 }
 

@@ -1,7 +1,6 @@
-# 博客仓库的发布 workflow。默认 WECHAT_MODE=html：构建网站和公众号复制页。
-# 不调用微信接口，没有草稿箱 job，没有 Tailscale，也不写 publish-state。
-# 内容仓库把 templates/blog-content/.github/workflows/notify.yml 复制到自己的 .github/workflows/ 后，
-# 用 GitHub App 安装令牌发 repository_dispatch。
+# 博客仓库的发布 workflow。构建网站和公众号复制页，并从公开内容仓库同步尚未入草稿箱、也未发布的公众号文章。
+# 微信接口只由固定 IP 上的 wechat-egress 调用。本 workflow 不请求微信，不群发，也不发表。
+# AppID 和 AppSecret 留在 VPS 的 TOML 里。内容仓库的 notify.yml 仍用 GitHub App 安装令牌发 repository_dispatch。
 
 name: Publish
 
@@ -42,19 +41,10 @@ jobs:
       - name: Checkout blog
         uses: actions/checkout@v4
 
-      - name: Create GitHub App token
-        id: app
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.PUBLISHER_APP_ID }}
-          private-key: ${{ secrets.PUBLISHER_APP_KEY }}
-          repositories: blog-content
-
       - name: Checkout content
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/blog-content
-          token: ${{ steps.app.outputs.token }}
+          repository: cute-rui/blog-source
           path: content
           ref: ${{ github.event.client_payload.after || 'main' }}
           fetch-depth: 0
@@ -69,6 +59,11 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: wechat-egress/go.mod
+          cache-dependency-path: wechat-egress/go.sum
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -137,3 +132,26 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4 pages deploy deploy-dist --project-name="${{ vars.CLOUDFLARE_PAGES_PROJECT || 'blog' }}" --commit-dirty=true
+
+      - name: Sync missing WeChat drafts
+        id: wechat
+        continue-on-error: true
+        working-directory: wechat-egress
+        env:
+          WECHAT_EGRESS_TOKEN: ${{ secrets.WECHAT_EGRESS_TOKEN }}
+          WECHAT_EGRESS_SRV_HOST: ${{ vars.WECHAT_EGRESS_SRV_HOST }}
+          WECHAT_EGRESS_TLS_SERVER_NAME: ${{ vars.WECHAT_EGRESS_TLS_SERVER_NAME }}
+          WECHAT_EGRESS_TLS_CA_PEM: ${{ secrets.WECHAT_EGRESS_TLS_CA }}
+        run: |
+          set -euo pipefail
+          if [ -n "${WECHAT_EGRESS_TLS_CA_PEM}" ]; then
+            printf '%s\n' "$WECHAT_EGRESS_TLS_CA_PEM" > "$RUNNER_TEMP/wechat-egress-ca.pem"
+            export WECHAT_EGRESS_TLS_CA="$RUNNER_TEMP/wechat-egress-ca.pem"
+          fi
+          unset WECHAT_EGRESS_TLS_CA_PEM
+          go build -o "$RUNNER_TEMP/wechat-egress" ./cmd/wechat-egress
+          WECHAT_EGRESS_BIN="$RUNNER_TEMP/wechat-egress" node ../scripts/sync-wechat-drafts.mjs
+
+      - name: Report WeChat sync failure
+        if: steps.wechat.outcome == 'failure'
+        run: exit 1
