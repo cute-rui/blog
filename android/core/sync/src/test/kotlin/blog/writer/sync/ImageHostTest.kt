@@ -1,5 +1,7 @@
 package blog.writer.sync
 
+import blog.writer.images.BesidePostImageHost
+import blog.writer.images.ImageHost
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -10,7 +12,7 @@ class ImageHostTest {
     @Test
     fun uploadStoresTheImageBesideThePost() = runBlocking {
         val files = linkedMapOf<String, ByteArray>()
-        val host = BesidePostImageHost(
+        val host: ImageHost = BesidePostImageHost(
             exists = { path -> files.containsKey(path) },
             write = { path, bytes -> files[path] = bytes },
         )

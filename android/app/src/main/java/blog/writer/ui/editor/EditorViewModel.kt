@@ -39,7 +39,7 @@ import blog.writer.search.SearchRouter
 import blog.writer.editor.MarkdownEdit
 import blog.writer.editor.PendingDrafts
 import blog.writer.editor.PendingSpan
-import blog.writer.sync.ImageHost
+import blog.writer.images.ImageHost
 import blog.writer.sync.articleCommitPaths
 import blog.writer.sync.imageFileName
 import blog.writer.sync.resolveArticleImage

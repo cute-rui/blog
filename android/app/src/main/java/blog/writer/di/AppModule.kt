@@ -15,8 +15,8 @@ import blog.writer.render.Md2wxWechatMarkdownRenderer
 import blog.writer.render.WechatMarkdownRenderer
 import blog.writer.search.ReachabilityProbe
 import blog.writer.search.SearchRouter
-import blog.writer.sync.BesidePostImageHost
-import blog.writer.sync.ImageHost
+import blog.writer.images.BesidePostImageHost
+import blog.writer.images.ImageHost
 import blog.writer.sync.SyncEngine
 import dagger.Module
 import dagger.Provides

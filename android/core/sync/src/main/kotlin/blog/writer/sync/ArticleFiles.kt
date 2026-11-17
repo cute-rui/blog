@@ -1,22 +1,5 @@
 package blog.writer.sync
 
-fun interface ImageHost {
-    suspend fun upload(articlePath: String, fileName: String, bytes: ByteArray): String
-}
-
-class BesidePostImageHost(
-    private val exists: (String) -> Boolean,
-    private val write: (String, ByteArray) -> Unit,
-) : ImageHost {
-    override suspend fun upload(articlePath: String, fileName: String, bytes: ByteArray): String {
-        val directory = articleDirectory(articlePath) ?: throw IllegalArgumentException(articlePath)
-        val leaf = imageFileName(fileName, bytes) ?: throw IllegalArgumentException(fileName)
-        val unique = uniqueFileName(directory, leaf, exists)
-        write("$directory/$unique", bytes)
-        return "./$unique"
-    }
-}
-
 fun articleDirectory(articlePath: String): String? {
     val directory = articlePath.substringBeforeLast('/', "")
     if (directory.contains("..")) return null
