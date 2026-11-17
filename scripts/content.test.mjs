@@ -6,6 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import sharp from 'sharp';
 import { DEV_PAGE_KEY, hmacPrefix, loadSchema, repoRoot, schemaErrors } from './lib/content.mjs';
+import { applyWechatBody } from './lib/wechat-body.mjs';
 import { lintPosts } from './lib/lint.mjs';
 import { parsePublishTo, preparePublish, slugFromPostsPath } from './lib/prepare-publish.mjs';
 import { renderSummary } from './lib/summary.mjs';
@@ -35,6 +36,36 @@ test('schema rejects unknown fields and supplies publish defaults', () => {
   assert.equal(good.data.publish.blog, true);
   assert.equal(good.data.publish.wechat, false);
   assert.equal(good.data.draft, false);
+  const overridden = schemaErrors(validate, {
+    title: '标题',
+    description: '摘要',
+    pubDate: '2026-11-14',
+    wechat: { body: [{ find: '甲', replace: '乙' }] },
+  });
+  assert.deepEqual(overridden.errors, []);
+  const parallel = schemaErrors(validate, {
+    title: '标题',
+    description: '摘要',
+    pubDate: '2026-11-14',
+    wechat: { bodyText: '另一篇' },
+  });
+  assert.ok(parallel.errors.length > 0);
+});
+
+test('wechat body overrides replace shared text and stale finds fail lint', () => {
+  const applied = applyWechatBody('甲\n\n乙\n', [{ find: '乙\n', replace: '丙\n' }]);
+  assert.equal(applied.text, '甲\n\n丙\n');
+  assert.equal(applied.stale.length, 0);
+  const dir = mkdtempSync(path.join(tmpdir(), 'wx-body-'));
+  const posts = path.join(dir, 'posts');
+  const slugDir = path.join(posts, 'shift');
+  mkdirSync(slugDir, { recursive: true });
+  writeFileSync(
+    path.join(slugDir, 'index.md'),
+    ['---', 'title: 标题', 'description: 摘要', 'pubDate: 2026-11-14', 'publish:', '  blog: true', '  wechat: true', 'wechat:', '  body:', '    - find: 不在正文', '      replace: 改写', '---', '正文', ''].join('\n'),
+  );
+  const result = lintPosts(posts, { repoRoot: root });
+  assert.ok(result.errors.some((error) => error.message.includes('对不上')));
 });
 
 test('lint enforces the wechat rules', () => {

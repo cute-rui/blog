@@ -79,7 +79,8 @@ private class YamlParser(private val lines: List<String>) {
             map[key] = if (rest.isNotEmpty()) {
                 parseScalar(rest)
             } else if (next != null && indentOf(next) > current) {
-                if (next.trimStart().startsWith("- ")) {
+                val marker = next.trimStart()
+                if (marker == "-" || marker.startsWith("- ")) {
                     parseList(indentOf(next))
                 } else {
                     YamlValue.MapValue(parseMap(indentOf(next)))
@@ -102,8 +103,11 @@ private class YamlParser(private val lines: List<String>) {
             val current = indentOf(raw)
             if (current < indent) break
             val trimmed = raw.trim()
-            if (!trimmed.startsWith("- ")) break
-            val rest = trimmed.removePrefix("- ").trim()
+            val rest = when {
+                trimmed == "-" -> ""
+                trimmed.startsWith("- ") -> trimmed.removePrefix("- ").trim()
+                else -> break
+            }
             index++
             items += if (rest.isEmpty()) {
                 if (index < lines.size && indentOf(lines[index]) > current && lines[index].isNotBlank()) {
@@ -135,6 +139,7 @@ private class YamlParser(private val lines: List<String>) {
 private fun parseScalar(raw: String): YamlValue {
     val text = raw.trim()
     if (text.isEmpty() || text == "null" || text == "~") return YamlValue.Empty
+    if (text.startsWith("\"")) return YamlValue.Text(readDoubleQuoted(text))
     if (text == "true") return YamlValue.Bool(true)
     if (text == "false") return YamlValue.Bool(false)
     if (text.startsWith("[") && text.endsWith("]")) {
@@ -241,9 +246,40 @@ private fun scalarText(value: YamlValue): String = when (value) {
 private fun quoteIfNeeded(value: String): String {
     val needsQuote = value.isEmpty() ||
         value != value.trim() ||
-        value.any { it == ':' || it == '#' || it == ',' || it == '[' || it == ']' || it == '{' || it == '}' } ||
+        value.any { it == ':' || it == '#' || it == ',' || it == '[' || it == ']' || it == '{' || it == '}' || it == '"' || it == '\\' || it == '\n' || it == '\r' || it == '\t' } ||
         value == "true" || value == "false" || value == "null" || value.matches(NUMBER)
-    return if (needsQuote) "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" else value
+    if (!needsQuote) return value
+    val escaped = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    return "\"$escaped\""
+}
+
+private fun readDoubleQuoted(text: String): String {
+    val out = StringBuilder()
+    var index = 1
+    while (index < text.length) {
+        val char = text[index]
+        if (char == '\\' && index + 1 < text.length) {
+            when (val escaped = text[index + 1]) {
+                '\\' -> out.append('\\')
+                '"' -> out.append('"')
+                'n' -> out.append('\n')
+                'r' -> out.append('\r')
+                't' -> out.append('\t')
+                else -> out.append(escaped)
+            }
+            index += 2
+            continue
+        }
+        if (char == '"') return out.toString()
+        out.append(char)
+        index++
+    }
+    return out.toString()
 }
 
 private fun indentOf(line: String): Int = line.indexOfFirst { it != ' ' }.let { if (it < 0) 0 else it }

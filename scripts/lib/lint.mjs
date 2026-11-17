@@ -12,6 +12,7 @@ import {
   schemaErrors,
 } from './content.mjs';
 import { findMd2wx, renderMarkdown } from './md2wx.mjs';
+import { applyWechatBody } from './wechat-body.mjs';
 
 function issue(file, message) {
   return { file, message: `${file} ${message}` };
@@ -82,8 +83,15 @@ export function lintPosts(postsDir, { repoRoot, requireBinary = true } = {}) {
       }
     }
 
+    const overrides = Array.isArray(wechat.body) ? wechat.body : [];
+    const applied = applyWechatBody(post.body, overrides);
+    if (publish.wechat && applied.stale.length) {
+      errors.push(issue(rel, `有 ${applied.stale.length} 处公众号正文差异对不上共享正文。`));
+    }
+    const markdown = publish.wechat ? applied.text : post.body;
+
     if (post.ext === '.md' && bin) {
-      const rendered = renderMarkdown(bin, post.body);
+      const rendered = renderMarkdown(bin, markdown);
       if (!rendered.ok) {
         errors.push(issue(rel, `Markdown 不能渲染成公众号 HTML：${rendered.error}`));
       } else {

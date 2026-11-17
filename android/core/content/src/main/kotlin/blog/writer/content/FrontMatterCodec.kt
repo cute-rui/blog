@@ -59,9 +59,19 @@ object FrontMatterCodec {
                 openComment = wechat["openComment"]?.asBoolean(),
                 fansOnlyComment = wechat["fansOnlyComment"]?.asBoolean(),
                 sourceUrl = wechat["sourceUrl"]?.asString(),
+                body = readOverrides(wechat["body"]),
             ),
             extra = map.filterKeys { it !in known },
         )
+    }
+
+    private fun readOverrides(value: YamlValue?): List<BodyOverride> {
+        val items = (value as? YamlValue.ListValue)?.items ?: return emptyList()
+        return items.mapNotNull { item ->
+            val map = item.asMap()
+            if ("find" !in map) return@mapNotNull null
+            BodyOverride(find = map["find"]?.asString().orEmpty(), replace = map["replace"]?.asString().orEmpty())
+        }
     }
 
     private fun readCrop(map: Map<String, YamlValue>): CoverCrop? {
@@ -106,6 +116,18 @@ object FrontMatterCodec {
         matter.wechat.openComment?.let { wechat["openComment"] = YamlValue.Bool(it) }
         matter.wechat.fansOnlyComment?.let { wechat["fansOnlyComment"] = YamlValue.Bool(it) }
         matter.wechat.sourceUrl?.takeIf { it.isNotBlank() }?.let { wechat["sourceUrl"] = YamlValue.Text(it) }
+        if (matter.wechat.body.isNotEmpty()) {
+            wechat["body"] = YamlValue.ListValue(
+                matter.wechat.body.map { override ->
+                    YamlValue.MapValue(
+                        linkedMapOf(
+                            "find" to YamlValue.Text(override.find),
+                            "replace" to YamlValue.Text(override.replace),
+                        ),
+                    )
+                },
+            )
+        }
         if (wechat.isNotEmpty()) map["wechat"] = YamlValue.MapValue(wechat)
         matter.extra.forEach { (key, value) -> if (key !in map) map[key] = value }
         return map

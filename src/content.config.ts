@@ -29,6 +29,14 @@ const wechatSchema = z
     openComment: z.boolean().optional(),
     fansOnlyComment: z.boolean().optional(),
     sourceUrl: z.string().optional(),
+    body: z
+      .array(
+        z.object({
+          find: z.string(),
+          replace: z.string(),
+        }),
+      )
+      .optional(),
   })
   .optional();
 

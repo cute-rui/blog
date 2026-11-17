@@ -18,6 +18,8 @@ import blog.writer.content.PostFrontMatter
 import blog.writer.content.PublishSelection
 import blog.writer.content.PublishTargets
 import blog.writer.content.WechatHtmlLength
+import blog.writer.content.applyWechatBody
+import blog.writer.content.diffWechatBody
 import blog.writer.content.countWritingCharacters
 import blog.writer.content.narrowSelection
 import blog.writer.content.publishButtonLabel
@@ -74,6 +76,8 @@ data class EditorUi(
     val fillRunning: Boolean = false,
     val checks: List<ContentIssue> = emptyList(),
     val publishLabel: String = Copy["publish_save_only"],
+    val surface: ArticleSurface = ArticleSurface.Blog,
+    val wechatStale: Int = 0,
 )
 
 @HiltViewModel
@@ -92,6 +96,8 @@ class EditorViewModel @Inject constructor(
     private var display = ""
     private var pending: PendingSpan? = null
     private var matter = PostFrontMatter()
+    private var sharedBody = ""
+    private var surface = ArticleSurface.Blog
     private var saveJob: Job? = null
     private var ideaJob: Job? = null
     private var fillJob: Job? = null
@@ -113,6 +119,66 @@ class EditorViewModel @Inject constructor(
         if (!ui.value.loaded || text == display) return
         pending = pending?.let { PendingDrafts.adjust(display, text, it) }
         display = text
+        if (surface == ArticleSurface.Blog) sharedBody = PendingDrafts.acceptedText(display, pending)
+        publishUi(savedLabel = Copy["saving"])
+        scheduleSave()
+    }
+
+    fun showBlog() {
+        if (surface == ArticleSurface.Blog) return
+        if (pending != null) {
+            publishUi(askDraft = true)
+            return
+        }
+        captureWechatEdits()
+        surface = ArticleSurface.Blog
+        display = sharedBody
+        publishUi(savedLabel = Copy["saving"])
+        _commands.tryEmit(TextCommand(display, 0))
+        scheduleSave()
+    }
+
+    fun showWechat() {
+        if (surface == ArticleSurface.Wechat) return
+        if (pending != null) {
+            publishUi(askDraft = true)
+            return
+        }
+        sharedBody = display
+        surface = ArticleSurface.Wechat
+        display = applyWechatBody(sharedBody, matter.wechat.body).text
+        publishUi(savedLabel = Copy["saving"])
+        _commands.tryEmit(TextCommand(display, 0))
+        scheduleSave()
+    }
+
+    fun setPublishWechat(included: Boolean) {
+        if (matter.publish.wechat == included) return
+        matter = matter.copy(publish = matter.publish.copy(wechat = included))
+        publishUi(savedLabel = Copy["saving"])
+        scheduleSave()
+    }
+
+    fun setWechatTitle(value: String) {
+        val next = value.takeIf { it.isNotBlank() && it != matter.title }
+        if (next == matter.wechat.title) return
+        matter = matter.copy(wechat = matter.wechat.copy(title = next))
+        publishUi(savedLabel = Copy["saving"])
+        scheduleSave()
+    }
+
+    fun setWechatDigest(value: String) {
+        val next = value.takeIf { it.isNotBlank() && it != matter.description }
+        if (next == matter.wechat.digest) return
+        matter = matter.copy(wechat = matter.wechat.copy(digest = next))
+        publishUi(savedLabel = Copy["saving"])
+        scheduleSave()
+    }
+
+    fun setWechatCover(value: String) {
+        val next = value.takeIf { it.isNotBlank() && it != matter.heroImage }
+        if (next == matter.wechat.cover) return
+        matter = matter.copy(wechat = matter.wechat.copy(cover = next))
         publishUi(savedLabel = Copy["saving"])
         scheduleSave()
     }
@@ -149,7 +215,11 @@ class EditorViewModel @Inject constructor(
         pending = snap.second
         _commands.tryEmit(TextCommand(snap.first, snap.second.endExclusive))
         viewModelScope.launch {
-            posts.savePending(path, snap.second.start, snap.first.substring(snap.second.start, snap.second.endExclusive))
+            if (surface == ArticleSurface.Blog) {
+                posts.savePending(path, snap.second.start, snap.first.substring(snap.second.start, snap.second.endExclusive))
+            } else {
+                posts.clearPending(path)
+            }
             persist()
             publishUi(message = null)
         }
@@ -338,7 +408,9 @@ class EditorViewModel @Inject constructor(
         pending = span
         _commands.tryEmit(TextCommand(text, span.endExclusive))
         viewModelScope.launch {
-            posts.savePending(path, span.start, text.substring(span.start, span.endExclusive))
+            if (surface == ArticleSurface.Blog) {
+                posts.savePending(path, span.start, text.substring(span.start, span.endExclusive))
+            }
             publishUi()
         }
     }
@@ -347,7 +419,7 @@ class EditorViewModel @Inject constructor(
 
     fun checksFor(blog: Boolean, wechat: Boolean): List<ContentIssue> {
         val selection = narrowSelection(matter.publish, PublishSelection(blog, wechat))
-        val document = PostDocument(path, matter, PendingDrafts.acceptedText(display, pending))
+        val document = PostDocument(path, matter, sharedBody)
         return ContentRules.inspect(
             document,
             PublishTargets(selection.blog, selection.wechat),
@@ -383,13 +455,18 @@ class EditorViewModel @Inject constructor(
     private suspend fun reload() {
         val document = posts.read(path)
         matter = document.frontMatter
+        sharedBody = document.body
         val saved = posts.pending(path)
         if (saved != null && saved.offset in 0..document.body.length) {
+            surface = ArticleSurface.Blog
             val inserted = PendingDrafts.insert(document.body, saved.offset, saved.text)
             display = inserted.first
             pending = inserted.second
+        } else if (surface == ArticleSurface.Wechat) {
+            display = applyWechatBody(sharedBody, matter.wechat.body).text
+            pending = null
         } else {
-            display = document.body
+            display = sharedBody
             pending = null
         }
         val marks = history.marks(path)
@@ -409,10 +486,23 @@ class EditorViewModel @Inject constructor(
     }
 
     private suspend fun persist() {
-        posts.writeBody(path, PendingDrafts.acceptedText(display, pending))
+        if (surface == ArticleSurface.Wechat) {
+            captureWechatEdits()
+        } else {
+            sharedBody = PendingDrafts.acceptedText(display, pending)
+        }
+        posts.writeArticle(path, matter, sharedBody)
         val span = pending
-        if (span != null && span.endExclusive <= display.length) {
+        if (surface == ArticleSurface.Blog && span != null && span.endExclusive <= display.length) {
             posts.savePending(path, span.start, display.substring(span.start, span.endExclusive))
+        }
+    }
+
+    private fun captureWechatEdits() {
+        val accepted = PendingDrafts.acceptedText(display, pending)
+        val applied = applyWechatBody(sharedBody, matter.wechat.body)
+        if (accepted != applied.text) {
+            matter = matter.copy(wechat = matter.wechat.copy(body = diffWechatBody(sharedBody, accepted)))
         }
     }
 
@@ -436,6 +526,8 @@ class EditorViewModel @Inject constructor(
                 askDraft = askDraft,
                 opening = openingMark,
                 ending = endingMark,
+                surface = surface,
+                wechatStale = applyWechatBody(sharedBody, matter.wechat.body).stale.size,
             )
         }
     }

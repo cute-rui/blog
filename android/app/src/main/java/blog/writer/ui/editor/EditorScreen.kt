@@ -235,6 +235,23 @@ fun EditorScreen(
                         .fillMaxSize()
                         .padding(horizontal = 24.dp),
                 ) {
+                    ArticleSurfaceBar(ui.surface, model::showBlog, model::showWechat)
+                    if (ui.wechatStale > 0) {
+                        Text(
+                            Copy.format("wechat_override_stale", "count" to ui.wechatStale),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                    if (ui.surface == ArticleSurface.Wechat) {
+                        WechatDifferenceFields(
+                            matter = ui.matter,
+                            onIncluded = model::setPublishWechat,
+                            onTitle = model::setWechatTitle,
+                            onDigest = model::setWechatDigest,
+                            onCover = model::setWechatCover,
+                        )
+                    }
                     if (ui.opening != null || ui.ending != null) {
                         Text(
                             Copy.format(
@@ -262,7 +279,8 @@ fun EditorScreen(
                     BasicTextField(
                         state = state,
                         modifier = Modifier
-                            .fillMaxSize()
+                            .weight(1f)
+                            .fillMaxWidth()
                             .appendAssistMenu { menu = true },
                         textStyle = textStyle,
                         cursorBrush = SolidColor(colors.primary),

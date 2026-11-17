@@ -73,6 +73,14 @@ object ContentRules {
             if (matter.heroImage.isNullOrBlank() && matter.wechat.cover.isNullOrBlank()) {
                 issues += ContentIssue("cover", Copy["issue_cover"], IssueSeverity.Warn)
             }
+            val stale = applyWechatBody(document.body, matter.wechat.body).stale.size
+            if (stale > 0) {
+                issues += ContentIssue(
+                    "wechat-body",
+                    Copy.format("wechat_override_stale", "count" to stale),
+                    IssueSeverity.Warn,
+                )
+            }
             if (!rendererBound || rendered == null) {
                 issues += ContentIssue(
                     "md2wx",
