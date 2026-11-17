@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	WechatEgress_GetStableToken_FullMethodName = "/blog.wechat.egress.v1.WechatEgress/GetStableToken"
 	WechatEgress_UploadImage_FullMethodName    = "/blog.wechat.egress.v1.WechatEgress/UploadImage"
+	WechatEgress_UploadCover_FullMethodName    = "/blog.wechat.egress.v1.WechatEgress/UploadCover"
 	WechatEgress_AddDraft_FullMethodName       = "/blog.wechat.egress.v1.WechatEgress/AddDraft"
 	WechatEgress_UpdateDraft_FullMethodName    = "/blog.wechat.egress.v1.WechatEgress/UpdateDraft"
 )
@@ -35,6 +36,11 @@ const (
 type WechatEgressClient interface {
 	GetStableToken(ctx context.Context, in *GetStableTokenRequest, opts ...grpc.CallOption) (*GetStableTokenResponse, error)
 	UploadImage(ctx context.Context, in *UploadImageRequest, opts ...grpc.CallOption) (*UploadImageResponse, error)
+	// UploadCover stores a jpeg or png as permanent image material and returns
+	// the media_id that draft/add expects in thumb_media_id. The server always
+	// uses material/add_material with type=image. Callers cannot pick another
+	// material type or another WeChat URL.
+	UploadCover(ctx context.Context, in *UploadCoverRequest, opts ...grpc.CallOption) (*UploadCoverResponse, error)
 	AddDraft(ctx context.Context, in *AddDraftRequest, opts ...grpc.CallOption) (*AddDraftResponse, error)
 	UpdateDraft(ctx context.Context, in *UpdateDraftRequest, opts ...grpc.CallOption) (*UpdateDraftResponse, error)
 }
@@ -61,6 +67,16 @@ func (c *wechatEgressClient) UploadImage(ctx context.Context, in *UploadImageReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UploadImageResponse)
 	err := c.cc.Invoke(ctx, WechatEgress_UploadImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *wechatEgressClient) UploadCover(ctx context.Context, in *UploadCoverRequest, opts ...grpc.CallOption) (*UploadCoverResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UploadCoverResponse)
+	err := c.cc.Invoke(ctx, WechatEgress_UploadCover_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +113,11 @@ func (c *wechatEgressClient) UpdateDraft(ctx context.Context, in *UpdateDraftReq
 type WechatEgressServer interface {
 	GetStableToken(context.Context, *GetStableTokenRequest) (*GetStableTokenResponse, error)
 	UploadImage(context.Context, *UploadImageRequest) (*UploadImageResponse, error)
+	// UploadCover stores a jpeg or png as permanent image material and returns
+	// the media_id that draft/add expects in thumb_media_id. The server always
+	// uses material/add_material with type=image. Callers cannot pick another
+	// material type or another WeChat URL.
+	UploadCover(context.Context, *UploadCoverRequest) (*UploadCoverResponse, error)
 	AddDraft(context.Context, *AddDraftRequest) (*AddDraftResponse, error)
 	UpdateDraft(context.Context, *UpdateDraftRequest) (*UpdateDraftResponse, error)
 	mustEmbedUnimplementedWechatEgressServer()
@@ -114,6 +135,9 @@ func (UnimplementedWechatEgressServer) GetStableToken(context.Context, *GetStabl
 }
 func (UnimplementedWechatEgressServer) UploadImage(context.Context, *UploadImageRequest) (*UploadImageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UploadImage not implemented")
+}
+func (UnimplementedWechatEgressServer) UploadCover(context.Context, *UploadCoverRequest) (*UploadCoverResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadCover not implemented")
 }
 func (UnimplementedWechatEgressServer) AddDraft(context.Context, *AddDraftRequest) (*AddDraftResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddDraft not implemented")
@@ -178,6 +202,24 @@ func _WechatEgress_UploadImage_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WechatEgress_UploadCover_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadCoverRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WechatEgressServer).UploadCover(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WechatEgress_UploadCover_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WechatEgressServer).UploadCover(ctx, req.(*UploadCoverRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WechatEgress_AddDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AddDraftRequest)
 	if err := dec(in); err != nil {
@@ -228,6 +270,10 @@ var WechatEgress_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UploadImage",
 			Handler:    _WechatEgress_UploadImage_Handler,
+		},
+		{
+			MethodName: "UploadCover",
+			Handler:    _WechatEgress_UploadCover_Handler,
 		},
 		{
 			MethodName: "AddDraft",

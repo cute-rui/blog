@@ -9,7 +9,9 @@ import blog.writer.data.db.WriterDao
 import blog.writer.data.db.WriterDatabase
 import blog.writer.data.files.LocalContentStore
 import blog.writer.ai.LlmClients
-import blog.writer.render.StubWechatMarkdownRenderer
+import blog.writer.data.egress.AndroidSrvDirectory
+import blog.writer.egress.SrvDirectory
+import blog.writer.render.Md2wxWechatMarkdownRenderer
 import blog.writer.render.WechatMarkdownRenderer
 import blog.writer.search.ReachabilityProbe
 import blog.writer.search.SearchRouter
@@ -59,7 +61,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun wechatRenderer(): WechatMarkdownRenderer = StubWechatMarkdownRenderer()
+    fun wechatRenderer(): WechatMarkdownRenderer = Md2wxWechatMarkdownRenderer()
+
+    @Provides
+    @Singleton
+    fun srvDirectory(): SrvDirectory = AndroidSrvDirectory()
 
     @Provides
     @Singleton

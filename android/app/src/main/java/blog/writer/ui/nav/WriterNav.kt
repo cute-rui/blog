@@ -14,6 +14,7 @@ import blog.writer.ui.editor.EditorScreen
 import blog.writer.ui.list.PostListScreen
 import blog.writer.ui.meta.FrontMatterScreen
 import blog.writer.ui.preview.PreviewScreen
+import blog.writer.ui.settings.EgressScreen
 import blog.writer.ui.settings.GithubScreen
 import blog.writer.ui.settings.LlmEditScreen
 import blog.writer.ui.settings.LlmHomeScreen
@@ -36,7 +37,9 @@ fun WriterNav(
     LaunchedEffect(nav) {
         nav.currentBackStackEntryFlow.collect { entry ->
             val route = entry.destination.route.orEmpty()
-            onSecureScreen(route.startsWith("llm") || route.startsWith("github") || route.startsWith("search"))
+            onSecureScreen(
+                route.startsWith("llm") || route.startsWith("github") || route.startsWith("search") || route.startsWith("egress"),
+            )
         }
     }
     NavHost(navController = nav, startDestination = "posts") {
@@ -75,6 +78,7 @@ fun WriterNav(
                 onBack = { nav.popBackStack() },
                 onLlm = { nav.navigate("llm") },
                 onGithub = { nav.navigate("github") },
+                onEgress = { nav.navigate("egress") },
                 onSearch = { nav.navigate("search") },
             )
         }
@@ -93,6 +97,9 @@ fun WriterNav(
         }
         composable("github") {
             GithubScreen(onBack = { nav.popBackStack() })
+        }
+        composable("egress") {
+            EgressScreen(onBack = { nav.popBackStack() })
         }
         composable("search") {
             SearchListScreen(

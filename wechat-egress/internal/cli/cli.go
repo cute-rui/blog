@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lightwing/blog/wechat-egress/internal/config"
 	"github.com/lightwing/blog/wechat-egress/internal/egress"
 	"github.com/lightwing/blog/wechat-egress/internal/pb"
 	"github.com/lightwing/blog/wechat-egress/internal/srvdns"
@@ -36,7 +37,7 @@ func Run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	switch args[0] {
 	case "server":
 		return runServer(args[1:], getenv, stderr)
-	case "stable-token", "upload-image", "add-draft", "update-draft":
+	case "stable-token", "upload-image", "upload-cover", "add-draft", "update-draft":
 		return runClient(args[0], args[1:], getenv, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n\n%s", args[0], usage)
@@ -47,11 +48,16 @@ func Run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 const usage = `wechat-egress — fixed-IP front for WeChat draft APIs
 
 Server (on the VPS):
-  wechat-egress server
+  wechat-egress server --config /etc/wechat-egress/config.toml
+
+The server reads AppID, AppSecret, the bearer token, listen address, and TLS
+paths from that TOML file. WECHAT_EGRESS_CONFIG may point at the file.
+Secrets are not read from the environment.
 
 Client (in the workflow; picks one):
   wechat-egress stable-token
   wechat-egress upload-image --file image.png
+  wechat-egress upload-cover --file cover.png
   wechat-egress add-draft --file draft.json
   wechat-egress update-draft --file draft.json
 
@@ -63,10 +69,7 @@ host:port is set. --insecure is plaintext and only dials a loopback address.
 func runServer(args []string, getenv func(string) string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("server", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	listen := fs.String("listen", envOr(getenv, "WECHAT_EGRESS_LISTEN", "0.0.0.0:8443"), "listen address")
-	cert := fs.String("tls-cert", getenv("WECHAT_EGRESS_TLS_CERT"), "TLS certificate PEM")
-	key := fs.String("tls-key", getenv("WECHAT_EGRESS_TLS_KEY"), "TLS private key PEM")
-	insecure := fs.Bool("insecure", envBool(getenv, "WECHAT_EGRESS_INSECURE"), "plaintext, loopback only")
+	configPath := fs.String("config", getenv("WECHAT_EGRESS_CONFIG"), "path to the TOML config")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -77,14 +80,23 @@ func runServer(args []string, getenv func(string) string, stderr io.Writer) int 
 		fmt.Fprintln(stderr, "server does not take positional arguments")
 		return 2
 	}
+	if strings.TrimSpace(*configPath) == "" {
+		fmt.Fprintln(stderr, "server config is required: --config or WECHAT_EGRESS_CONFIG")
+		return 2
+	}
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err.Error())
+		return 1
+	}
 	srv, err := egress.NewServer(egress.ServerConfig{
-		AppID:    getenv("WECHAT_APPID"),
-		Secret:   getenv("WECHAT_APPSECRET"),
-		Token:    getenv("WECHAT_EGRESS_TOKEN"),
-		APIBase:  getenv("WECHAT_API_BASE"),
-		Insecure: *insecure,
-		CertFile: *cert,
-		KeyFile:  *key,
+		AppID:    cfg.AppID,
+		Secret:   cfg.AppSecret,
+		Token:    cfg.Token,
+		APIBase:  cfg.APIBase,
+		Insecure: cfg.Insecure,
+		CertFile: cfg.TLSCert,
+		KeyFile:  cfg.TLSKey,
 		Logger:   log.New(stderr, "", 0),
 	})
 	if err != nil {
@@ -93,7 +105,7 @@ func runServer(args []string, getenv func(string) string, stderr io.Writer) int 
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	if err := srv.ListenAndServe(ctx, *listen); err != nil {
+	if err := srv.ListenAndServe(ctx, cfg.Listen); err != nil {
 		fmt.Fprintln(stderr, err.Error())
 		return 1
 	}
@@ -163,6 +175,22 @@ func runClient(cmd string, args []string, getenv func(string) string, stdout, st
 			return 1
 		}
 		return writeJSON(stdout, stderr, map[string]any{"url": url})
+	case "upload-cover":
+		if *file == "" {
+			fmt.Fprintln(stderr, "--file is required")
+			return 2
+		}
+		content, err := readLimited(*file, 1<<20)
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		mediaID, err := client.UploadCover(ctx, content, baseName(*file))
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return writeJSON(stdout, stderr, map[string]any{"media_id": mediaID})
 	case "add-draft":
 		articles, err := readAdd(*file)
 		if err != nil {

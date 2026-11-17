@@ -159,6 +159,45 @@ func TestStableTokenUploadAndDraftsStayOnLoopback(t *testing.T) {
 	}
 }
 
+func TestUploadCoverUsesPermanentImageMaterial(t *testing.T) {
+	var gotPath, gotType, gotToken string
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		switch r.URL.Path {
+		case pathStableToken:
+			writeJSON(w, map[string]any{"access_token": "access-token-value", "expires_in": 7200})
+		case pathAddMaterial:
+			gotPath = r.URL.Path
+			gotType = r.URL.Query().Get("type")
+			gotToken = r.URL.Query().Get("access_token")
+			gotBody = append([]byte(nil), body...)
+			if r.URL.Query().Get("type") != "image" {
+				t.Errorf("type %q", r.URL.RawQuery)
+			}
+			writeJSON(w, map[string]any{"media_id": "cover-media", "url": "http://mmbiz.qpic.cn/cover"})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	api := newTestAPI(t, srv, nil)
+	mediaID, err := api.UploadCover(context.Background(), pngBytes(t), "cover.png")
+	if err != nil || mediaID != "cover-media" {
+		t.Fatalf("cover %q %v", mediaID, err)
+	}
+	if gotPath != pathAddMaterial || gotType != "image" || gotToken != "access-token-value" {
+		t.Fatalf("path %s type %s token %s", gotPath, gotType, gotToken)
+	}
+	if !bytes.Contains(gotBody, []byte("image/png")) || !bytes.Contains(gotBody, pngBytes(t)) {
+		t.Fatal("cover body was not the png")
+	}
+	if bytes.Contains(gotBody, []byte("api.weixin.qq.com")) {
+		t.Fatal("cover body named the WeChat host")
+	}
+}
+
 func TestRejectsBadDraftsWithoutCallingUpstream(t *testing.T) {
 	called := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

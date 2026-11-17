@@ -1,0 +1,12 @@
+# Copy this file off the repo, fill in the real values, and chmod 0600.
+# The server reads this file only. Do not put these values in the environment.
+# Placeholders below are not credentials.
+
+app_id = "wx-your-app-id"
+app_secret = "your-app-secret"
+token = "your-egress-bearer-token"
+listen = "0.0.0.0:8443"
+tls_cert = "/etc/wechat-egress/cert.pem"
+tls_key = "/etc/wechat-egress/key.pem"
+insecure = false
+api_base = ""

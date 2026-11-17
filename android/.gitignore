@@ -8,6 +8,7 @@
 captures/
 *.apk
 *.aab
+*.so
 *.keystore
 !debug.keystore
 .DS_Store

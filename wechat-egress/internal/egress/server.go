@@ -208,6 +208,17 @@ func (s *Server) UploadImage(ctx context.Context, req *pb.UploadImageRequest) (*
 	return &pb.UploadImageResponse{Url: url}, nil
 }
 
+func (s *Server) UploadCover(ctx context.Context, req *pb.UploadCoverRequest) (*pb.UploadCoverResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing request")
+	}
+	mediaID, err := s.api.UploadCover(ctx, req.GetContent(), req.GetFilename())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &pb.UploadCoverResponse{MediaId: mediaID}, nil
+}
+
 func (s *Server) AddDraft(ctx context.Context, req *pb.AddDraftRequest) (*pb.AddDraftResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing request")

@@ -130,6 +130,20 @@ func (c *Client) UploadImage(ctx context.Context, content []byte, filename strin
 	return out.GetUrl(), nil
 }
 
+// UploadCover uploads a jpeg or png and returns the permanent media_id.
+func (c *Client) UploadCover(ctx context.Context, content []byte, filename string) (string, error) {
+	var out *pb.UploadCoverResponse
+	err := c.call(ctx, func(ctx context.Context, api pb.WechatEgressClient) error {
+		resp, err := api.UploadCover(ctx, &pb.UploadCoverRequest{Content: content, Filename: filename})
+		out = resp
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return out.GetMediaId(), nil
+}
+
 // AddDraft creates a draft and returns its media_id.
 func (c *Client) AddDraft(ctx context.Context, articles []*pb.Article) (string, error) {
 	var out *pb.AddDraftResponse

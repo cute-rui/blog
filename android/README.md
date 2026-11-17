@@ -41,9 +41,17 @@ sdk.dir=/path/to/Android/sdk
 - 内置服务补上智谱 Web Search、百度千帆 AI 搜索、阿里云 IQS、Exa、Serper。
 - 多源合并会同时查前几个可用来源，按网址合并，优先域名上浮。
 
+## 微信草稿出口
+
+手机不调用 `api.weixin.qq.com`，也不保存 AppID / AppSecret。设置里的「微信出口」填 SRV 域名和出口令牌，两者用 Android Keystore 的 AES-GCM 加密。域名是 `_wechat._tcp.` 后面的那一截，例如 `example.com`。
+
+预览页仍可以「复制公众号格式」。另外有「放进公众号草稿箱」：用 `md2wx` 的 `blogTheme()` 和 `render()` 生成 HTML，正文图走 `UploadImage`，封面走 `UploadCover`，然后 `AddDraft`。这篇文章已经有草稿 id 时改为 `UpdateDraft`。没有 freepublish，也没有群发。
+
+`libmd2wx_android.so` 不进仓库。在 `md2wx/ffi` 里按 `md2wx/README.md` 交叉编译后，产物在 `md2wx/jniLibs/<abi>/`。App 直接引用那个目录。没有 `.so` 时预览会说明库还没放进来，复制页按钮照常可用，草稿不会用测试替身发出去。
+
 ## 还没接上的部分
 
-- 公众号预览只调用 `WechatMarkdownRenderer`。现在的实现是 `StubWechatMarkdownRenderer`，返回固定标记，不把 Markdown 排成微信 HTML。真正的渲染要等后续把 `md2wx` 用 UniFFI 绑进来，换掉这个测试替身。
+- 公众号预览和草稿 HTML 都走 `md2wx` 的 UniFFI（`blogTheme` 和 `render`）。`StubWechatMarkdownRenderer` 只留在单元测试里，证明调用方不依赖某一种 HTML 实现。没有 `.so` 时预览打不开真正的排版。
 - 同步客户端打的是 GitHub REST，但这次没有对真实的 `blog-content` 仓库跑过。没有令牌时只保存在本机。
 - 没有在模拟器或真机上点过界面。验证是 `assembleDebug` 和 JVM 单元测试。
 - 百度千帆只解析 `v2/ai_search/web_search` 的 `references`。阿里云 IQS 只做 Bearer 的 `search/unified` 和 `pageItems`，没有 AccessKey 签名。Kimi 的引用字段不稳定，只认 `references`、`search_results` 和 `message.citations`；只有工具调用、没有这些字段时返回 0 条。

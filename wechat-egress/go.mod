@@ -3,6 +3,7 @@ module github.com/lightwing/blog/wechat-egress
 go 1.22
 
 require (
+	github.com/pelletier/go-toml/v2 v2.2.4
 	google.golang.org/grpc v1.69.4
 	google.golang.org/protobuf v1.36.5
 )
