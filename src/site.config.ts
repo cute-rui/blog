@@ -34,7 +34,7 @@ export const siteConfig: SiteConfig = {
     { label: '关于', href: '/about/' },
   ],
   social: [
-    { label: 'GitHub', href: 'https://github.com/' },
+    { label: 'GitHub', href: 'https://github.com/cute-rui' },
     { label: 'Atom', href: '/atom.xml' },
   ],
 };
