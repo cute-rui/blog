@@ -21,6 +21,7 @@ data class WechatFields(
     val openComment: Boolean? = null,
     val fansOnlyComment: Boolean? = null,
     val sourceUrl: String? = null,
+    val body: List<BodyOverride> = emptyList(),
 )
 
 data class PostFrontMatter(

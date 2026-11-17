@@ -133,6 +133,62 @@ class ContentTest {
     }
 
     @Test
+    fun wechatBodyOverridesRoundTripWithNewlinesAndQuotes() {
+        val document = PostDocument(
+            path = "posts/shift/index.md",
+            frontMatter = PostFrontMatter(
+                title = "博客标题",
+                description = "博客摘要",
+                pubDate = "2026-11-14",
+                heroImage = "./cover.jpg",
+                publish = PublishTargets(blog = true, wechat = true),
+                wechat = WechatFields(
+                    title = "短标题",
+                    digest = "公众号摘要",
+                    cover = "./cover-wechat.jpg",
+                    body = listOf(BodyOverride("他说\"甲\"\n下一行", "公众号\n这一段")),
+                ),
+            ),
+            body = "他说\"甲\"\n下一行\n\n其余共用。\n",
+        )
+        val again = FrontMatterCodec.decode(document.path, FrontMatterCodec.encode(document))
+        assertEquals(document.frontMatter, again.frontMatter)
+        assertEquals(document.body, again.body)
+        assertEquals("短标题", again.frontMatter.wechatTitle())
+        assertEquals("公众号摘要", again.frontMatter.wechatDigest())
+    }
+
+    @Test
+    fun staleWechatBodyOverrideWarnsOnlyWhenWechatIsSelected() {
+        val document = PostDocument(
+            path = "posts/ok/index.md",
+            frontMatter = PostFrontMatter(
+                title = "短标题",
+                description = "描述",
+                pubDate = "2026-11-14",
+                heroImage = "./cover.jpg",
+                publish = PublishTargets(blog = true, wechat = true),
+                wechat = WechatFields(body = listOf(BodyOverride("不在正文里", "改"))),
+            ),
+            body = "正文",
+        )
+        val selected = ContentRules.inspect(
+            document,
+            PublishTargets(blog = true, wechat = true),
+            rendered = null,
+            rendererBound = false,
+        )
+        assertTrue(selected.any { it.code == "wechat-body" && it.severity == IssueSeverity.Warn })
+        val blogOnly = ContentRules.inspect(
+            document,
+            PublishTargets(blog = true, wechat = false),
+            rendered = null,
+            rendererBound = false,
+        )
+        assertFalse(blogOnly.any { it.code == "wechat-body" })
+    }
+
+    @Test
     fun schemaListsTheSharedRequiredFields() {
         val schema = ContentSchema.text()
         ContentSchema.requiredKeys().forEach { key ->

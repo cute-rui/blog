@@ -29,7 +29,17 @@
         "coverCrop": { "type": "object" },
         "openComment": { "type": "boolean" },
         "fansOnlyComment": { "type": "boolean" },
-        "sourceUrl": { "type": "string" }
+        "sourceUrl": { "type": "string" },
+        "body": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "find": { "type": "string" },
+              "replace": { "type": "string" }
+            }
+          }
+        }
       }
     }
   }

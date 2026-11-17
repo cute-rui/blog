@@ -32,6 +32,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import blog.writer.content.slugOf
+import blog.writer.content.wechatBody
 import blog.writer.data.repo.GithubSettingsRepository
 import blog.writer.data.repo.PostRepository
 import blog.writer.data.repo.WechatDraftSync
@@ -79,7 +80,7 @@ class PreviewViewModel @Inject constructor(
             val document = posts.read(path)
             val rendered = runCatching {
                 renderer.render(
-                    markdown = document.body,
+                    markdown = document.wechatBody(),
                     theme = WechatTheme(accent = "#2D5786", ink = "#1E1C19", paper = "#FAF7F0", muted = "#4C463E"),
                     options = WechatRenderOptions(imageUrlPrefix = ""),
                 )

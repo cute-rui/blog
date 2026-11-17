@@ -2,6 +2,7 @@ package blog.writer.data.repo
 import blog.writer.copy.Copy
 
 import blog.writer.content.PostDocument
+import blog.writer.content.wechatBody
 import blog.writer.data.db.WechatDraftEntity
 import blog.writer.data.db.WriterDao
 import blog.writer.data.files.LocalContentStore
@@ -92,7 +93,7 @@ private fun PostDocument.toDraftInput(): DraftInput {
         path = path,
         slug = slug,
         title = matter.wechatTitle(),
-        body = body,
+        body = wechatBody(),
         author = matter.wechat.author.orEmpty(),
         digest = matter.wechatDigest(),
         publishBlog = matter.publish.blog,

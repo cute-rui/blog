@@ -75,6 +75,10 @@ class PostRepository @Inject constructor(
         write(current.copy(body = body), dirty = true)
     }
 
+    suspend fun writeArticle(path: String, matter: PostFrontMatter, body: String) {
+        write(PostDocument(path, matter, body), dirty = true)
+    }
+
     suspend fun writeMatter(path: String, matter: PostFrontMatter, newSlug: String): String {
         val current = read(path)
         val slug = newSlug.trim().ifBlank { slugOf(path) }

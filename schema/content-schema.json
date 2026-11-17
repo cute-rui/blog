@@ -85,6 +85,19 @@
         "sourceUrl": {
           "type": "string",
           "description": "阅读原文。auto 表示本文的博客地址；publish.blog 为 false 且值为 auto 时为空。"
+        },
+        "body": {
+          "type": "array",
+          "description": "对共享正文的小段替换，按顺序套用。find 是共享正文里的原文，replace 是公众号上的文字。find 为空只在共享正文为空时表示整篇替换。",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["find", "replace"],
+            "properties": {
+              "find": { "type": "string" },
+              "replace": { "type": "string" }
+            }
+          }
         }
       }
     }
