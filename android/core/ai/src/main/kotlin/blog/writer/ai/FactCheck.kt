@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 import blog.writer.search.FactCheckSearchSettings
 import blog.writer.search.RoutedSearch
@@ -39,8 +40,10 @@ data class RawJudgement(
 )
 
 object FactCheckRules {
-    const val RETRIEVAL_FAILED = "无法核实（检索失败）"
-    const val NOT_SEARCHED = "未检索"
+    val RETRIEVAL_FAILED: String
+        get() = blog.writer.copy.Copy["fact_retrieval_failed"]
+    val NOT_SEARCHED: String
+        get() = blog.writer.copy.Copy["fact_not_searched"]
 
     fun sanitize(
         claim: String,
@@ -69,8 +72,8 @@ object FactCheckRules {
 
     fun retrievalFailure(claim: ExtractedClaim, routed: RoutedSearch): CheckedClaim {
         val reason = routed.attempts.joinToString(" · ") { attempt ->
-            "${attempt.profileName}：${attempt.failure ?: "失败"}"
-        }.ifBlank { "没有可用的搜索来源" }
+            Copy.format("fact_attempt", "name" to attempt.profileName, "failure" to (attempt.failure ?: Copy["fact_attempt_failed"]))
+        }.ifBlank { Copy["fact_no_sources"] }
         return CheckedClaim(
             claim = claim.claim,
             query = claim.query,
@@ -80,7 +83,7 @@ object FactCheckRules {
             sourceIndexes = emptyList(),
             fix = null,
             results = emptyList(),
-            attempts = routed.attempts.map { "${it.profileName}：${it.failure ?: "失败"}" },
+            attempts = routed.attempts.map { Copy.format("fact_attempt", "name" to it.profileName, "failure" to (it.failure ?: Copy["fact_attempt_failed"])) },
             searched = true,
             inSource = true,
         )
@@ -91,7 +94,7 @@ object FactCheckRules {
         query = claim.query,
         verdict = Verdict.Unverifiable,
         label = NOT_SEARCHED,
-        reason = "超出本次检索条数",
+        reason = Copy["fact_over_limit"],
         sourceIndexes = emptyList(),
         fix = null,
         results = emptyList(),
@@ -101,17 +104,17 @@ object FactCheckRules {
     )
 
     fun parseVerdict(value: String): Verdict = when (value.trim()) {
-        "属实" -> Verdict.Supported
-        "存疑" -> Verdict.Uncertain
-        "错误" -> Verdict.Wrong
+        Copy["fact_supported"] -> Verdict.Supported
+        Copy["fact_uncertain"] -> Verdict.Uncertain
+        Copy["fact_wrong"] -> Verdict.Wrong
         else -> Verdict.Unverifiable
     }
 
     fun labelOf(verdict: Verdict): String = when (verdict) {
-        Verdict.Supported -> "属实"
-        Verdict.Uncertain -> "存疑"
-        Verdict.Wrong -> "错误"
-        Verdict.Unverifiable -> "无法核实"
+        Verdict.Supported -> Copy["fact_supported"]
+        Verdict.Uncertain -> Copy["fact_uncertain"]
+        Verdict.Wrong -> Copy["fact_wrong"]
+        Verdict.Unverifiable -> Copy["fact_unverifiable"]
     }
 }
 
@@ -134,7 +137,7 @@ class FactChecker(
                         query = "",
                         verdict = Verdict.Unverifiable,
                         label = FactCheckRules.RETRIEVAL_FAILED,
-                        reason = "还没有可用的搜索来源",
+                        reason = Copy["fact_no_sources_yet"],
                         sourceIndexes = emptyList(),
                         fix = null,
                         results = emptyList(),
@@ -156,7 +159,7 @@ class FactChecker(
         val unmatched = mutableListOf<CheckedClaim>()
         for (claim in searched) {
             if (!text.contains(claim.claim)) {
-                unmatched += FactCheckRules.notSearched(claim).copy(inSource = false, reason = "原文里找不到这条摘录")
+                unmatched += FactCheckRules.notSearched(claim).copy(inSource = false, reason = Copy["fact_claim_not_in_source"])
                 continue
             }
             val routed = router.search(claim.query, profiles, settings, spent)
@@ -184,14 +187,14 @@ fun parseClaims(raw: String): List<ExtractedClaim> =
     }
 
 fun parseJudgement(raw: String): RawJudgement {
-    val json = jsonObjects(raw).firstOrNull() ?: return RawJudgement("无法核实", "", emptyList(), null)
+    val json = jsonObjects(raw).firstOrNull() ?: return RawJudgement(Copy["fact_unverifiable"], "", emptyList(), null)
     val dto = runCatching { claimJson.decodeFromString<JudgementDto>(json) }.getOrNull()
-        ?: return RawJudgement("无法核实", "", emptyList(), null)
+        ?: return RawJudgement(Copy["fact_unverifiable"], "", emptyList(), null)
     return RawJudgement(dto.verdict, dto.reason, dto.sources, dto.fix)
 }
 
 fun formatSearchResults(results: List<SearchResult>): String = results.joinToString("\n") { result ->
-    val date = result.publishedAt?.toString() ?: "无日期"
+    val date = result.publishedAt?.toString() ?: Copy["fact_no_date"]
     val site = result.siteName ?: result.url
     "[${result.rank}] ${result.title} / $site / $date / ${result.url}\n    ${result.snippet}"
 }
@@ -201,7 +204,7 @@ private data class ClaimDto(val claim: String, val query: String = "")
 
 @Serializable
 private data class JudgementDto(
-    val verdict: String = "无法核实",
+    val verdict: String = Copy["fact_unverifiable"],
     val reason: String = "",
     val sources: List<Int> = emptyList(),
     val fix: String? = null,

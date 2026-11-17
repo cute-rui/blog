@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -246,7 +247,7 @@ fun mapOpenAi(event: SseEvent, box: ModelBox): LlmEvent? {
     if (event.data == "[DONE]") return LlmEvent.Done(usage = null, model = box.model)
     val obj = runCatching { Json.parseToJsonElement(event.data).jsonObject }.getOrNull() ?: return null
     obj["error"]?.jsonObject?.let { error ->
-        val message = error["message"]?.jsonPrimitive?.contentOrNull ?: "模型返回错误"
+        val message = error["message"]?.jsonPrimitive?.contentOrNull ?: Copy["model_error"]
         return LlmEvent.Failed(LlmError.Protocol(message))
     }
     obj["model"]?.jsonPrimitive?.contentOrNull?.let { box.model = it }
@@ -272,7 +273,7 @@ fun mapAnthropic(event: SseEvent, box: ModelBox): LlmEvent? {
         }
         "message_stop" -> LlmEvent.Done(usage = null, model = box.model)
         "error" -> LlmEvent.Failed(
-            LlmError.Protocol(obj["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull ?: "模型返回错误"),
+            LlmError.Protocol(obj["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull ?: Copy["model_error"]),
         )
         else -> {
             val text = obj["content"]?.jsonArray?.firstOrNull()?.jsonObject
@@ -286,7 +287,7 @@ fun mapGemini(event: SseEvent, box: ModelBox): LlmEvent? {
     val obj = runCatching { Json.parseToJsonElement(event.data).jsonObject }.getOrNull() ?: return null
     obj["modelVersion"]?.jsonPrimitive?.contentOrNull?.let { box.model = it }
     obj["error"]?.jsonObject?.let { error ->
-        return LlmEvent.Failed(LlmError.Protocol(error["message"]?.jsonPrimitive?.contentOrNull ?: "模型返回错误"))
+        return LlmEvent.Failed(LlmError.Protocol(error["message"]?.jsonPrimitive?.contentOrNull ?: Copy["model_error"]))
     }
     val parts = obj["candidates"]?.jsonArray?.firstOrNull()?.jsonObject
         ?.get("content")?.jsonObject?.get("parts") as? JsonArray

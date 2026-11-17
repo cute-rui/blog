@@ -18,6 +18,7 @@ rootProject.name = "writer"
 
 include(
     ":app",
+    ":core:copy",
     ":core:content",
     ":core:editor",
     ":core:render",

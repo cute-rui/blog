@@ -1,4 +1,5 @@
 package blog.writer.egress
+import blog.writer.copy.Copy
 
 import java.math.BigDecimal
 import java.net.URI
@@ -67,12 +68,12 @@ class DraftBox(
         val html = fillImages(input.path, rendered)
         val characters = html.codePointCount(0, html.length)
         val size = html.toByteArray(Charsets.UTF_8).size
-        if (characters < 1 || characters >= 20_000) throw EgressException("正文必须少于 20000 字")
-        if (size >= 1 shl 20) throw EgressException("正文必须小于 1MB")
+        if (characters < 1 || characters >= 20_000) throw EgressException(Copy["body_char_limit"])
+        if (size >= 1 shl 20) throw EgressException(Copy["body_byte_limit"])
         val coverRef = input.coverPath?.trim().orEmpty()
-        if (coverRef.isEmpty()) throw EgressException("草稿需要封面图")
+        if (coverRef.isEmpty()) throw EgressException(Copy["cover_required"])
         val coverFile = resolvePostFile(input.path, coverRef)
-        val cover = readFile(coverFile) ?: throw EgressException("找不到封面 $coverFile")
+        val cover = readFile(coverFile) ?: throw EgressException(Copy.format("cover_missing", "path" to coverFile))
         val thumb = egress.uploadCover(cover, fileName(coverFile))
         val article = EgressArticle(
             title = input.title,
@@ -88,7 +89,7 @@ class DraftBox(
         val existing = draftIds.get(input.path)?.trim().orEmpty()
         if (existing.isEmpty()) {
             val mediaId = egress.addDraft(article)
-            if (mediaId.isBlank()) throw EgressException("draft response did not include a media_id")
+            if (mediaId.isBlank()) throw EgressException(Copy["media_id_missing"])
             draftIds.put(input.path, mediaId)
             return DraftResult(mediaId, updated = false)
         }
@@ -98,9 +99,9 @@ class DraftBox(
 
     private fun fillImages(postPath: String, rendered: DraftHtml): String {
         val replacements = rendered.images.map { image ->
-            if (!rendered.html.contains(image.placeholder)) throw EgressException("正文里没有 ${image.placeholder}")
+            if (!rendered.html.contains(image.placeholder)) throw EgressException(Copy.format("image_placeholder_missing", "placeholder" to image.placeholder))
             val path = resolvePostFile(postPath, image.path)
-            val bytes = readFile(path) ?: throw EgressException("找不到图片 $path")
+            val bytes = readFile(path) ?: throw EgressException(Copy.format("image_missing", "path" to path))
             image.placeholder to egress.uploadImage(bytes, fileName(path))
         }
         return substituteImages(rendered.html, replacements)
@@ -110,11 +111,11 @@ class DraftBox(
 fun substituteImages(html: String, replacements: List<Pair<String, String>>): String {
     var out = html
     for ((placeholder, url) in replacements.sortedByDescending { it.first.length }) {
-        if (!PLACEHOLDER.matches(placeholder)) throw EgressException("图片占位符不对")
-        if (!out.contains(placeholder)) throw EgressException("正文里没有 $placeholder")
+        if (!PLACEHOLDER.matches(placeholder)) throw EgressException(Copy["image_placeholder_bad"])
+        if (!out.contains(placeholder)) throw EgressException(Copy.format("image_placeholder_missing", "placeholder" to placeholder))
         out = out.replace(placeholder, requireImageUrl(url))
     }
-    if (out.contains("{{wx-img:")) throw EgressException("还有图片没有上传")
+    if (out.contains("{{wx-img:")) throw EgressException(Copy["images_remain"])
     return out
 }
 
@@ -122,13 +123,13 @@ fun requireImageUrl(url: String): String {
     val parsed = try {
         URI(url)
     } catch (error: Exception) {
-        throw EgressException("图片地址不对", error)
+        throw EgressException(Copy["image_url_bad"], error)
     }
-    if (parsed.scheme != "http" && parsed.scheme != "https") throw EgressException("图片地址必须是 http 或 https")
-    val host = parsed.host ?: throw EgressException("图片地址没有主机名")
-    if (parsed.userInfo != null) throw EgressException("图片地址不能带账号")
+    if (parsed.scheme != "http" && parsed.scheme != "https") throw EgressException(Copy["image_url_scheme"])
+    val host = parsed.host ?: throw EgressException(Copy["image_url_host"])
+    if (parsed.userInfo != null) throw EgressException(Copy["image_url_userinfo"])
     if (host.equals("api.weixin.qq.com", ignoreCase = true)) {
-        throw EgressException("图片地址不能是微信接口")
+        throw EgressException(Copy["image_url_wechat_api"])
     }
     return url
 }
@@ -136,13 +137,13 @@ fun requireImageUrl(url: String): String {
 fun resolvePostFile(postPath: String, ref: String): String {
     val raw = ref.trim()
     if (raw.isEmpty() || raw.contains('\\') || raw.startsWith("/") || raw.contains("://")) {
-        throw EgressException("图片路径不对")
+        throw EgressException(Copy["image_path_bad"])
     }
-    if (raw.split('/').any { it == ".." }) throw EgressException("图片路径不能包含 ..")
+    if (raw.split('/').any { it == ".." }) throw EgressException(Copy["image_path_parent"])
     val dir = postPath.substringBeforeLast('/', "")
-    if (!dir.startsWith("posts/") && !dir.startsWith("drafts/")) throw EgressException("文章路径不对")
+    if (!dir.startsWith("posts/") && !dir.startsWith("drafts/")) throw EgressException(Copy["post_path_bad"])
     val relative = raw.removePrefix("./")
-    if (relative.isEmpty() || relative.startsWith("/")) throw EgressException("图片路径不对")
+    if (relative.isEmpty() || relative.startsWith("/")) throw EgressException(Copy["image_path_bad"])
     return "$dir/$relative"
 }
 
@@ -169,7 +170,7 @@ private fun crops(crop: CoverFractions?): List<EgressCrop> {
 }
 
 private fun unit(value: Double): String {
-    if (value.isNaN() || value < 0.0 || value > 1.0) throw EgressException("封面裁剪必须在 0 到 1 之间")
+    if (value.isNaN() || value < 0.0 || value > 1.0) throw EgressException(Copy["cover_crop_range"])
     return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
 }
 

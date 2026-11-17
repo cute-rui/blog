@@ -5,8 +5,16 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -29,16 +37,23 @@ class MainActivity : ComponentActivity() {
             val appearanceModel: AppearanceViewModel = hiltViewModel()
             val appearance by appearanceModel.appearance.collectAsState()
             WritingTheme(useDynamicColor = appearance.dynamicColor) {
-                WriterNav(
-                    appearance = appearance,
-                    onSecureScreen = { secure ->
-                        if (secure) {
-                            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                        } else {
-                            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                        }
-                    },
-                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .windowInsetsPadding(WindowInsets.safeDrawing),
+                ) {
+                    WriterNav(
+                        appearance = appearance,
+                        onSecureScreen = { secure ->
+                            if (secure) {
+                                window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                            } else {
+                                window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                            }
+                        },
+                    )
+                }
             }
         }
     }

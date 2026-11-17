@@ -10,6 +10,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:copy"))
     implementation(libs.grpc.okhttp)
     implementation(libs.grpc.protobuf)
     implementation(libs.grpc.stub)

@@ -1,4 +1,5 @@
 package blog.writer.egress
+import blog.writer.copy.Copy
 
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -42,7 +43,7 @@ fun queryName(service: String, domain: String): String {
 fun normalizeSrvDomain(raw: String): String {
     var domain = raw.trim()
     if (domain.contains("://") || domain.contains("/") || domain.any { it.isWhitespace() }) {
-        throw EgressException("SRV 域名只填域，例如 example.com")
+        throw EgressException(Copy["srv_domain_only"])
     }
     domain = domain.removeSuffix(".")
     val prefix = "$DEFAULT_SERVICE."
@@ -50,7 +51,7 @@ fun normalizeSrvDomain(raw: String): String {
     return try {
         queryName(DEFAULT_SERVICE, domain).removePrefix(prefix)
     } catch (error: IllegalArgumentException) {
-        throw EgressException("SRV 域名不对", error)
+        throw EgressException(Copy["srv_domain_invalid"], error)
     }
 }
 
@@ -149,7 +150,7 @@ private fun validateService(service: String) {
 }
 
 private fun validateDomain(domain: String) {
-    if (domain.isEmpty()) throw IllegalArgumentException("SRV host is required")
+    if (domain.isEmpty()) throw IllegalArgumentException(Copy["srv_host_required"])
     if (domain.length > 253) throw IllegalArgumentException("SRV host \"$domain\" is too long")
     for (label in domain.split('.')) {
         try {

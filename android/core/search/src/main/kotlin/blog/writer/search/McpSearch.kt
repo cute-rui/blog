@@ -1,4 +1,5 @@
 package blog.writer.search
+import blog.writer.copy.Copy
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -182,7 +183,7 @@ object McpResults {
 class McpClient(private val http: OkHttpClient) {
     fun handshake(serverUrl: String, auth: McpAuth): McpHandshake {
         val init = rpc(serverUrl, auth, null, "2025-03-26", 1, "initialize", initializeParams(), expectBody = true)
-        val result = init.result?.jsonObject ?: throw SearchException("initialize 没有返回结果")
+        val result = init.result?.jsonObject ?: throw SearchException(Copy["mcp_no_result"])
         val protocol = result.optText("protocolVersion") ?: "2025-03-26"
         val info = result["serverInfo"] as? JsonObject
         notify(serverUrl, auth, init.sessionId, protocol)
@@ -221,10 +222,10 @@ class McpClient(private val http: OkHttpClient) {
             },
             expectBody = true,
         )
-        val result = called.result ?: throw SearchException("没有工具结果")
+        val result = called.result ?: throw SearchException(Copy["mcp_no_tool_result"])
         val errorFlag = (result as? JsonObject)?.get("isError")?.jsonPrimitive?.contentOrNull
         if (errorFlag == "true") {
-            val message = McpResults.textOf(result).ifBlank { "工具返回错误" }
+            val message = McpResults.textOf(result).ifBlank { Copy["tool_error"] }
             throw SearchException(message)
         }
         return result
@@ -309,10 +310,10 @@ internal fun parseRpc(contentType: String?, body: String, id: Int): JsonObject {
     } else {
         trimmed
     }
-    if (jsonText.isBlank()) throw SearchException("空响应")
+    if (jsonText.isBlank()) throw SearchException(Copy["empty_response"])
     val obj = Json.parseToJsonElement(jsonText).jsonObject
     val error = obj["error"] as? JsonObject
-    if (error != null) throw SearchException(error.optText("message") ?: "MCP 错误")
+    if (error != null) throw SearchException(error.optText("message") ?: Copy["mcp_error"])
     return obj
 }
 
@@ -338,10 +339,10 @@ private fun looksLikeSearch(name: String, description: String): Boolean {
 }
 
 private fun explain(status: Int, body: String): String = when (status) {
-    401, 403 -> "key 错误"
-    402 -> "额度用尽"
-    404 -> "地址错"
-    429 -> "被限流"
+    401, 403 -> Copy["key_error"]
+    402 -> Copy["quota_spent"]
+    404 -> Copy["address_wrong"]
+    429 -> Copy["rate_limited"]
     else -> "HTTP $status ${body.take(180)}"
 }
 
@@ -362,7 +363,7 @@ class McpSearchAdapter(
     override val capabilities: SearchCapabilities = SearchCapabilities(maxResultsCap = 10)
 
     override suspend fun search(request: SearchRequest): SearchResponse {
-        if (toolName.isBlank()) throw SearchException("还没有选择工具")
+        if (toolName.isBlank()) throw SearchException(Copy["tool_not_chosen"])
         val arguments = McpParams.arguments(paramMap, request)
         val started = System.nanoTime()
         val toolResult = client.callTool(serverUrl, auth, toolName, arguments)
@@ -378,13 +379,13 @@ class McpSearchAdapter(
                 } catch (error: SearchException) {
                     throw error
                 } catch (error: Exception) {
-                    throw SearchException(error.message ?: "模型整理失败")
+                    throw SearchException(error.message ?: Copy["organize_failed"])
                 }
                 val kept = McpResults.keepUrlsPresentIn(text.ifBlank { raw }, organized)
-                if (kept.size < organized.size) dropped += "丢弃了未出现在工具文本里的网址"
+                if (kept.size < organized.size) dropped += Copy["dropped_urls"]
                 kept
             }
-            else -> throw SearchException("无法解析工具结果")
+            else -> throw SearchException(Copy["cannot_parse_tool"])
         }
         val latency = (System.nanoTime() - started) / 1_000_000
         val normalized = SearchNormalizer.normalize(

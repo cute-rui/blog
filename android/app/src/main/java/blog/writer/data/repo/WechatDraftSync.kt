@@ -1,4 +1,5 @@
 package blog.writer.data.repo
+import blog.writer.copy.Copy
 
 import blog.writer.content.PostDocument
 import blog.writer.data.db.WechatDraftEntity
@@ -42,8 +43,8 @@ class WechatDraftSync @Inject constructor(
     fun hasDraft(path: String): Boolean = dao.wechatDraft(path) != null
 
     suspend fun send(path: String): DraftResult = withContext(Dispatchers.IO) {
-        val domain = egressSettings.domain() ?: throw EgressException("先在设置里填写 SRV 域名")
-        val token = egressSettings.token() ?: throw EgressException("先在设置里填写出口令牌")
+        val domain = egressSettings.domain() ?: throw EgressException(Copy["need_srv_domain"])
+        val token = egressSettings.token() ?: throw EgressException(Copy["need_egress_token"])
         val document = posts.read(path)
         val site = github.current().siteOrigin
         val client = dial(
@@ -76,7 +77,7 @@ class WechatDraftSync @Inject constructor(
             options = WechatRenderOptions(imageUrlPrefix = ""),
         )
         if (result.htmlFragment == StubWechatMarkdownRenderer.MARKER) {
-            throw EgressException("测试替身不能用来生成草稿")
+            throw EgressException(Copy["stub_cannot_draft"])
         }
         return DraftHtml(
             html = result.htmlFragment,

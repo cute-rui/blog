@@ -43,6 +43,7 @@ android {
     sourceSets.named("main") {
         kotlin.srcDir("$rootDir/../md2wx/bindings/kotlin")
         jniLibs.srcDir("$rootDir/../md2wx/jniLibs")
+        assets.srcDir("$rootDir/core/copy/src/main/resources")
     }
 }
 
@@ -53,6 +54,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:copy"))
     implementation(project(":core:content"))
     implementation(project(":core:editor"))
     implementation(project(":core:render"))

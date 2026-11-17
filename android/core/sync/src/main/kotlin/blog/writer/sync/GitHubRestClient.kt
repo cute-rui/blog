@@ -1,4 +1,5 @@
 package blog.writer.sync
+import blog.writer.copy.Copy
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -36,7 +37,7 @@ class GitHubRestClient(
     override suspend fun tree(treeSha: String): List<RemoteFile> {
         val body = get("/git/trees/$treeSha?recursive=1")
         val payload = json.decodeFromString<TreePayload>(body)
-        if (payload.truncated) throw GitHubException("仓库目录太大，这次没有列全")
+        if (payload.truncated) throw GitHubException(Copy["tree_too_large"])
         return payload.tree.mapNotNull { item ->
             val sha = item.sha ?: return@mapNotNull null
             if (item.type != "blob") return@mapNotNull null
@@ -149,10 +150,10 @@ class GitHubRestClient(
         branch.split('/').joinToString("/") { java.net.URLEncoder.encode(it, Charsets.UTF_8) }
 
     private fun errorMessage(status: Int, body: String): String = when (status) {
-        401 -> "GitHub 令牌无效"
-        403 -> "GitHub 令牌没有这个仓库的权限"
-        404 -> "找不到仓库或分支"
-        else -> "GitHub 返回 $status ${body.take(180)}"
+        401 -> Copy["github_token_invalid"]
+        403 -> Copy["github_token_forbidden"]
+        404 -> Copy["github_not_found"]
+        else -> Copy.format("github_status", "status" to status, "body" to body.take(180))
     }
 
     @Serializable

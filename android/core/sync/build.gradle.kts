@@ -8,6 +8,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:copy"))
     implementation(libs.serialization.json)
     implementation(libs.coroutines.core)
     implementation(libs.okhttp)

@@ -1,4 +1,5 @@
 package blog.writer.data.repo
+import blog.writer.copy.Copy
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -34,7 +35,7 @@ data class OpenConflict(
 data class SyncSnapshot(
     val syncing: Boolean = false,
     val offline: Boolean = false,
-    val message: String = "已同步",
+    val message: String = Copy["synced"],
     val conflicts: List<OpenConflict> = emptyList(),
 )
 
@@ -59,28 +60,28 @@ class SyncCoordinator @Inject constructor(
 
     suspend fun sync(selection: PublishSelection? = null, onlyPaths: Set<String>? = null): String {
         if (!online()) {
-            _state.value = SyncSnapshot(offline = true, message = "离线 · 本地已保存")
-            return "离线，改动留在本机"
+            _state.value = SyncSnapshot(offline = true, message = Copy["offline_saved"])
+            return Copy["offline_kept"]
         }
         val settings = github.current()
         val token = github.token()
         if (settings.owner.isBlank() || settings.repo.isBlank() || token.isNullOrBlank()) {
-            _state.value = SyncSnapshot(message = "还没有配置 GitHub")
-            return "还没有配置 GitHub，只保存在本机"
+            _state.value = SyncSnapshot(message = Copy["github_not_configured"])
+            return Copy["github_local_only"]
         }
-        _state.value = _state.value.copy(syncing = true, message = "同步中…")
+        _state.value = _state.value.copy(syncing = true, message = Copy["syncing"])
         val client = GitHubRestClient(http, settings.owner, settings.repo, token)
         return try {
             val pulled = pull(client, settings.branch)
             if (pulled != null) return pulled
             if (selection == null && onlyPaths == null && posts.localFiles().none { isDirtyFile(it) }) {
-                _state.value = SyncSnapshot(message = "已同步")
-                return "已同步"
+                _state.value = SyncSnapshot(message = Copy["synced"])
+                return Copy["synced"]
             }
             push(client, settings.branch, selection ?: PublishSelection(blog = false, wechat = false), onlyPaths)
         } catch (error: Exception) {
-            _state.value = SyncSnapshot(message = error.message ?: "同步失败")
-            error.message ?: "同步失败"
+            _state.value = SyncSnapshot(message = error.message ?: Copy["sync_failed"])
+            error.message ?: Copy["sync_failed"]
         }
     }
 
@@ -117,8 +118,8 @@ class SyncCoordinator @Inject constructor(
         }
         github.rememberHead(outcome.headSha, System.currentTimeMillis())
         if (conflicts.isNotEmpty()) {
-            _state.value = SyncSnapshot(message = "有冲突", conflicts = conflicts)
-            return "远端有改动，需要你选择保留哪一版"
+            _state.value = SyncSnapshot(message = Copy["has_conflict"], conflicts = conflicts)
+            return Copy["remote_choice"]
         }
         _state.value = _state.value.copy(syncing = false, conflicts = emptyList())
         return null
@@ -130,16 +131,20 @@ class SyncCoordinator @Inject constructor(
         selection: PublishSelection,
         onlyPaths: Set<String>?,
     ): String {
-        val head = github.current().baseCommitSha ?: return "还没有拉取过仓库"
+        val head = github.current().baseCommitSha ?: return Copy["never_pulled"]
         val filesToSend = posts.localFiles().filter { file ->
             val selected = onlyPaths == null || file.path in onlyPaths
             selected && isDirtyFile(file)
         }
         if (filesToSend.isEmpty()) {
-            _state.value = SyncSnapshot(message = "已同步")
-            return "没有需要提交的改动"
+            _state.value = SyncSnapshot(message = Copy["synced"])
+            return Copy["nothing_to_commit"]
         }
-        val summary = if (filesToSend.size == 1) "更新 ${filesToSend.first().path}" else "更新 ${filesToSend.size} 个文件"
+        val summary = if (filesToSend.size == 1) {
+            Copy.format("update_one", "path" to filesToSend.first().path)
+        } else {
+            Copy.format("update_many", "count" to filesToSend.size)
+        }
         val result = engine.push(
             client,
             PushRequest(
@@ -159,13 +164,13 @@ class SyncCoordinator @Inject constructor(
                     files.writeBase(file.path, file.bytes)
                 }
                 github.rememberHead(result.commitSha, System.currentTimeMillis())
-                _state.value = SyncSnapshot(message = "已同步")
-                "已提交"
+                _state.value = SyncSnapshot(message = Copy["synced"])
+                Copy["committed"]
             }
             is PushResult.RemoteMoved -> {
                 github.rememberHead(result.currentSha, System.currentTimeMillis())
-                _state.value = SyncSnapshot(message = "有冲突")
-                "远端已经往前走了，先拉取再决定"
+                _state.value = SyncSnapshot(message = Copy["has_conflict"])
+                Copy["remote_moved"]
             }
             is PushResult.Failed -> {
                 _state.value = SyncSnapshot(message = result.message)

@@ -7,5 +7,6 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core:copy"))
     testImplementation(libs.junit)
 }

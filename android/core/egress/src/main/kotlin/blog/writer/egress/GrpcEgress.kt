@@ -1,4 +1,5 @@
 package blog.writer.egress
+import blog.writer.copy.Copy
 
 import blog.wechat.egress.v1.AddDraftRequest
 import blog.wechat.egress.v1.Article
@@ -27,7 +28,7 @@ fun bearerInterceptor(token: String) =
 
 fun newChannel(endpoint: Endpoint, insecure: Boolean, token: String): ManagedChannel {
     if (insecure && !isLoopbackHost(endpoint.host)) {
-        throw EgressException("insecure gRPC is only allowed for loopback targets, not ${endpoint.host}")
+        throw EgressException(Copy.format("insecure_not_loopback", "host" to endpoint.host))
     }
     val builder = OkHttpChannelBuilder.forAddress(endpoint.host, endpoint.port)
         .intercept(bearerInterceptor(token))
@@ -66,7 +67,7 @@ internal class GrpcCall(private val channel: ManagedChannel) : EgressCall {
                 .build(),
         )
         val mediaId = response.mediaId
-        if (mediaId.isBlank()) throw EgressException("cover response did not include a media_id")
+        if (mediaId.isBlank()) throw EgressException(Copy["cover_media_id_missing"])
         mediaId
     }
 
@@ -75,7 +76,7 @@ internal class GrpcCall(private val channel: ManagedChannel) : EgressCall {
             AddDraftRequest.newBuilder().addArticles(article.toProto()).build(),
         )
         val mediaId = response.mediaId
-        if (mediaId.isBlank()) throw EgressException("draft response did not include a media_id")
+        if (mediaId.isBlank()) throw EgressException(Copy["media_id_missing"])
         mediaId
     }
 

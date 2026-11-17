@@ -1,4 +1,5 @@
 package blog.writer.ui.editor
+import blog.writer.copy.Copy
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -72,7 +73,7 @@ data class EditorUi(
     val factRunning: Boolean = false,
     val fillRunning: Boolean = false,
     val checks: List<ContentIssue> = emptyList(),
-    val publishLabel: String = "只保存，不发布",
+    val publishLabel: String = Copy["publish_save_only"],
 )
 
 @HiltViewModel
@@ -112,7 +113,7 @@ class EditorViewModel @Inject constructor(
         if (!ui.value.loaded || text == display) return
         pending = pending?.let { PendingDrafts.adjust(display, text, it) }
         display = text
-        publishUi(savedLabel = "正在保存…")
+        publishUi(savedLabel = Copy["saving"])
         scheduleSave()
     }
 
@@ -123,7 +124,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch {
             posts.clearPending(path)
             persist()
-            publishUi(message = "已接受")
+            publishUi(message = Copy["accepted"])
         }
     }
 
@@ -137,7 +138,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch {
             posts.clearPending(path)
             persist()
-            publishUi(message = "已丢弃")
+            publishUi(message = Copy["discarded"])
         }
     }
 
@@ -220,7 +221,7 @@ class EditorViewModel @Inject constructor(
         }
         val target = FillMiddle.target(display, openingMark, endingMark)
         if (target == null) {
-            publishUi(message = "需先标出开头和结尾，或在空行写 <!-- fill -->")
+            publishUi(message = Copy["action_fill_need"])
             return
         }
         fillJob?.cancel()
@@ -394,7 +395,7 @@ class EditorViewModel @Inject constructor(
         val marks = history.marks(path)
         openingMark = marks?.opening
         endingMark = marks?.ending
-        publishUi(loaded = true, savedLabel = "已打开")
+        publishUi(loaded = true, savedLabel = Copy["opened"])
         _commands.tryEmit(TextCommand(display, display.length))
     }
 
@@ -403,7 +404,7 @@ class EditorViewModel @Inject constructor(
         saveJob = viewModelScope.launch {
             delay(1_000)
             persist()
-            publishUi(savedLabel = "刚刚保存")
+            publishUi(savedLabel = Copy["just_saved"])
         }
     }
 
@@ -425,7 +426,7 @@ class EditorViewModel @Inject constructor(
             it.copy(
                 loaded = loaded,
                 path = path,
-                title = matter.title.ifBlank { "未命名" },
+                title = matter.title.ifBlank { Copy["untitled"] },
                 body = display,
                 matter = matter,
                 pending = pending,

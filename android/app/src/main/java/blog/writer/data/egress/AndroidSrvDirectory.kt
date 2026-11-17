@@ -1,6 +1,7 @@
 package blog.writer.data.egress
 
 import android.net.DnsResolver
+import blog.writer.copy.Copy
 import blog.writer.egress.DEFAULT_SERVICE
 import blog.writer.egress.EgressException
 import blog.writer.egress.Endpoint
@@ -43,7 +44,7 @@ class AndroidSrvDirectory(
             null,
             object : DnsResolver.Callback<ByteArray> {
                 override fun onAnswer(response: ByteArray, rcode: Int) {
-                    if (rcode != 0) failure.set(EgressException("dns rcode $rcode"))
+                    if (rcode != 0) failure.set(EgressException(Copy.format("dns_rcode", "code" to rcode)))
                     else answer.set(response)
                     latch.countDown()
                 }
@@ -54,9 +55,9 @@ class AndroidSrvDirectory(
                 }
             },
         )
-        if (!latch.await(5, TimeUnit.SECONDS)) throw EgressException("查询 $name 超时")
+        if (!latch.await(5, TimeUnit.SECONDS)) throw EgressException(Copy.format("dns_timeout", "name" to name))
         failure.get()?.let { throw it }
-        return answer.get() ?: throw EgressException("查询 $name 没有响应")
+        return answer.get() ?: throw EgressException(Copy.format("dns_no_response", "name" to name))
     }
 
     private companion object {

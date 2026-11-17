@@ -1,4 +1,5 @@
 package blog.writer.ui.meta
+import blog.writer.copy.Copy
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,7 +42,7 @@ class FrontMatterViewModel @Inject constructor(
     private val posts: PostRepository,
 ) : ViewModel() {
     private val original = decodePath(savedStateHandle.get<String>("path").orEmpty())
-    val saved = MutableStateFlow("文章信息")
+    val saved = MutableStateFlow(Copy["article_info"])
     var matter by mutableStateOf(PostFrontMatter())
         private set
     var slug by mutableStateOf("")
@@ -66,7 +67,7 @@ class FrontMatterViewModel @Inject constructor(
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
             posts.writeMatter(original, matter, slug)
-            saved.value = "已保存"
+            saved.value = Copy["saved"]
             onDone()
         }
     }
@@ -85,31 +86,31 @@ fun FrontMatterScreen(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TextButton(onClick = onBack) { Text("返回") }
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
             Text(note)
-            Field("标题", matter.title) { model.update(matter.copy(title = it)) }
-            Field("描述", matter.description) { model.update(matter.copy(description = it)) }
-            Field("发布日期", matter.pubDate) { model.update(matter.copy(pubDate = it)) }
-            Field("更新日期", matter.updatedDate.orEmpty()) { model.update(matter.copy(updatedDate = it.ifBlank { null })) }
-            Field("标签", matter.tags.joinToString(", ")) {
+            Field(Copy["meta_title"], matter.title) { model.update(matter.copy(title = it)) }
+            Field(Copy["meta_description"], matter.description) { model.update(matter.copy(description = it)) }
+            Field(Copy["meta_pub_date"], matter.pubDate) { model.update(matter.copy(pubDate = it)) }
+            Field(Copy["meta_updated"], matter.updatedDate.orEmpty()) { model.update(matter.copy(updatedDate = it.ifBlank { null })) }
+            Field(Copy["meta_tags"], matter.tags.joinToString(", ")) {
                 model.update(matter.copy(tags = it.split(',').map { tag -> tag.trim() }.filter { tag -> tag.isNotEmpty() }))
             }
-            Field("路径名", model.slug) { model.updateSlug(it) }
-            Field("封面", matter.heroImage.orEmpty()) { model.update(matter.copy(heroImage = it.ifBlank { null })) }
-            Field("封面说明", matter.heroAlt.orEmpty()) { model.update(matter.copy(heroAlt = it.ifBlank { null })) }
-            Toggle("草稿", matter.draft) { model.update(matter.copy(draft = it)) }
-            Toggle("发布到博客", matter.publish.blog) { model.update(matter.copy(publish = matter.publish.copy(blog = it))) }
-            Toggle("生成公众号版本", matter.publish.wechat) { model.update(matter.copy(publish = PublishTargets(matter.publish.blog, it))) }
-            Text("公众号")
-            Field("公众号标题", matter.wechat.title.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(title = it.ifBlank { null }))) }
-            Field("作者", matter.wechat.author.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(author = it.ifBlank { null }))) }
-            Field("摘要", matter.wechat.digest.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(digest = it.ifBlank { null }))) }
-            Field("公众号封面", matter.wechat.cover.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(cover = it.ifBlank { null }))) }
-            Field("阅读原文", matter.wechat.sourceUrl.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(sourceUrl = it.ifBlank { null }))) }
-            Toggle("开启评论", matter.wechat.openComment == true) {
+            Field(Copy["meta_slug"], model.slug) { model.updateSlug(it) }
+            Field(Copy["meta_cover"], matter.heroImage.orEmpty()) { model.update(matter.copy(heroImage = it.ifBlank { null })) }
+            Field(Copy["meta_cover_alt"], matter.heroAlt.orEmpty()) { model.update(matter.copy(heroAlt = it.ifBlank { null })) }
+            Toggle(Copy["draft"], matter.draft) { model.update(matter.copy(draft = it)) }
+            Toggle(Copy["publish_blog"], matter.publish.blog) { model.update(matter.copy(publish = matter.publish.copy(blog = it))) }
+            Toggle(Copy["publish_wechat"], matter.publish.wechat) { model.update(matter.copy(publish = PublishTargets(matter.publish.blog, it))) }
+            Text(Copy["wechat"])
+            Field(Copy["meta_wechat_title"], matter.wechat.title.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(title = it.ifBlank { null }))) }
+            Field(Copy["meta_author"], matter.wechat.author.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(author = it.ifBlank { null }))) }
+            Field(Copy["meta_digest"], matter.wechat.digest.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(digest = it.ifBlank { null }))) }
+            Field(Copy["meta_wechat_cover"], matter.wechat.cover.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(cover = it.ifBlank { null }))) }
+            Field(Copy["meta_source_url"], matter.wechat.sourceUrl.orEmpty()) { model.update(matter.copy(wechat = matter.wechat.copy(sourceUrl = it.ifBlank { null }))) }
+            Toggle(Copy["meta_comments"], matter.wechat.openComment == true) {
                 model.update(matter.copy(wechat = matter.wechat.copy(openComment = it)))
             }
-            Button(onClick = { model.save(onBack) }, modifier = Modifier.fillMaxWidth()) { Text("保存") }
+            Button(onClick = { model.save(onBack) }, modifier = Modifier.fillMaxWidth()) { Text(Copy["save"]) }
         }
     }
 }

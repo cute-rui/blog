@@ -1,4 +1,5 @@
 package blog.writer.sync
+import blog.writer.copy.Copy
 
 enum class ProgressPhase { Idle, Building, Success, Failed }
 
@@ -25,7 +26,7 @@ fun mapPublishProgress(
         return PublishProgress(blog = null, wechat = null, draft = null)
     }
     if (run == null) {
-        val waiting = TargetProgress(ProgressPhase.Idle, "还没有构建记录")
+        val waiting = TargetProgress(ProgressPhase.Idle, Copy["progress_no_build"])
         return PublishProgress(
             blog = waiting.takeIf { blogSelected },
             wechat = waiting.takeIf { wechatSelected },
@@ -38,18 +39,18 @@ fun mapPublishProgress(
         null
     } else {
         when {
-            building -> TargetProgress(ProgressPhase.Building, "构建中…", run.htmlUrl)
-            failed -> TargetProgress(ProgressPhase.Failed, "失败：构建没有完成", run.htmlUrl, "查看日志")
-            else -> TargetProgress(ProgressPhase.Success, "网站已上线", run.htmlUrl)
+            building -> TargetProgress(ProgressPhase.Building, Copy["progress_building"], run.htmlUrl)
+            failed -> TargetProgress(ProgressPhase.Failed, Copy["progress_build_failed"], run.htmlUrl, Copy["view_log"])
+            else -> TargetProgress(ProgressPhase.Success, Copy["site_live"], run.htmlUrl)
         }
     }
     val wechat = if (!wechatSelected) {
         null
     } else {
         when {
-            building -> TargetProgress(ProgressPhase.Building, "构建中…", run.htmlUrl)
-            failed -> TargetProgress(ProgressPhase.Failed, "失败：公众号版本没有生成", run.htmlUrl, "查看日志")
-            else -> TargetProgress(ProgressPhase.Success, "公众号版本已就绪", run.htmlUrl)
+            building -> TargetProgress(ProgressPhase.Building, Copy["progress_building"], run.htmlUrl)
+            failed -> TargetProgress(ProgressPhase.Failed, Copy["wechat_build_failed"], run.htmlUrl, Copy["view_log"])
+            else -> TargetProgress(ProgressPhase.Success, Copy["wechat_build_ready"], run.htmlUrl)
         }
     }
     val draftJob = run.jobs.firstOrNull { job ->
@@ -60,27 +61,27 @@ fun mapPublishProgress(
         null
     } else if (draftJob == null) {
         when {
-            building -> TargetProgress(ProgressPhase.Building, "同步中…", run.htmlUrl)
+            building -> TargetProgress(ProgressPhase.Building, Copy["syncing"], run.htmlUrl)
             failed -> TargetProgress(
                 ProgressPhase.Failed,
-                "失败：没有找到草稿箱任务",
+                Copy["draft_job_missing"],
                 run.htmlUrl,
-                "公众号版本仍可复制",
+                Copy["wechat_still_copyable"],
             )
-            else -> TargetProgress(ProgressPhase.Success, "已进入公众号草稿箱", run.htmlUrl)
+            else -> TargetProgress(ProgressPhase.Success, Copy["entered_drafts"], run.htmlUrl)
         }
     } else {
         val jobBuilding = draftJob.status != "completed"
         val jobFailed = draftJob.status == "completed" && draftJob.conclusion != "success"
         when {
-            jobBuilding -> TargetProgress(ProgressPhase.Building, "同步中…", run.htmlUrl)
+            jobBuilding -> TargetProgress(ProgressPhase.Building, Copy["syncing"], run.htmlUrl)
             jobFailed -> TargetProgress(
                 ProgressPhase.Failed,
-                "失败：草稿箱同步没有完成",
+                Copy["draft_sync_failed"],
                 run.htmlUrl,
-                "公众号版本仍可复制",
+                Copy["wechat_still_copyable"],
             )
-            else -> TargetProgress(ProgressPhase.Success, "已进入公众号草稿箱", run.htmlUrl)
+            else -> TargetProgress(ProgressPhase.Success, Copy["entered_drafts"], run.htmlUrl)
         }
     }
     return PublishProgress(blog, wechat, draft)

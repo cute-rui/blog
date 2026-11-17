@@ -1,4 +1,5 @@
 package blog.writer.search
+import blog.writer.copy.Copy
 
 import java.net.URI
 import java.time.Instant
@@ -25,7 +26,7 @@ object SearchNormalizer {
         if (request.language != null && !capabilities.language) ignored += "language"
         if (request.region != null && !capabilities.region) ignored += "region"
         if (request.wantFullContent && !capabilities.fullContent) {
-            warnings += "该来源不提供正文"
+            warnings += Copy["warning_no_body"]
         }
         val prepared = hits.mapIndexedNotNull { index, hit ->
             val url = canonicalize(hit.url) ?: return@mapIndexedNotNull null
@@ -55,10 +56,10 @@ object SearchNormalizer {
             includeOk && excludeOk && freshnessOk && sinceOk
         }
         if (!capabilities.freshness && request.freshness != Freshness.ANY) {
-            warnings += "该来源不支持时效过滤，已改为本地过滤"
+            warnings += Copy["warning_freshness"]
         }
         if (!capabilities.includeDomains && request.includeDomains.isNotEmpty()) {
-            warnings += "该来源不支持包含域名，已改为本地过滤"
+            warnings += Copy["warning_domains"]
         }
         val deduped = dedupe(filtered)
         val ordered = floatPreferred(deduped, preferredDomains).mapIndexed { index, result ->

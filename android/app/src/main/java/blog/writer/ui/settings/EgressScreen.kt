@@ -1,4 +1,5 @@
 package blog.writer.ui.settings
+import blog.writer.copy.Copy
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,16 +50,16 @@ class EgressViewModel @Inject constructor(
             val result = runCatching { settings.save(domain, token.ifBlank { null }) }
             result.fold(
                 onSuccess = {
-                    message = "已保存"
+                    message = Copy["saved"]
                     last4 = settings.tokenLast4()
                     token = ""
                 },
                 onFailure = { error ->
                     message = when {
                         error.message?.contains("16") == true || error.message?.contains("whitespace") == true ->
-                            "出口令牌至少 16 位，不能有空格"
-                        error.message?.contains("SRV") == true -> error.message ?: "SRV 域名不对"
-                        else -> error.message ?: "没有保存"
+                            Copy["egress_token_rules"]
+                        error.message?.contains("SRV") == true -> error.message ?: Copy["srv_domain_invalid"]
+                        else -> error.message ?: Copy["save_failed"]
                     }
                 },
             )
@@ -73,30 +74,30 @@ fun EgressScreen(onBack: () -> Unit, model: EgressViewModel = hiltViewModel()) {
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text("微信出口", style = MaterialTheme.typography.headlineSmall)
+            TextButton(onClick = onBack) { Text(Copy["back"]) }
+            Text(Copy["row_egress"], style = MaterialTheme.typography.headlineSmall)
             Text(
-                "手机查询 _wechat._tcp.加上这个域名，再连固定 IP 上的 gRPC。AppID 和 AppSecret 只放在那台 VPS 上，不进这台手机。",
+                Copy["egress_note"],
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedTextField(
                 value = model.domain,
                 onValueChange = { model.domain = it },
-                label = { Text("SRV 域名") },
-                supportingText = { Text("例如 example.com，不要填地址和端口") },
+                label = { Text(Copy["srv_domain"]) },
+                supportingText = { Text(Copy["srv_domain_hint"]) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = model.token,
                 onValueChange = { model.token = it },
-                label = { Text(if (model.last4 != null) "出口令牌 · 末 4 位 ${model.last4}" else "出口令牌") },
+                label = { Text(if (model.last4 != null) Copy.format("egress_token_last4", "last4" to model.last4) else Copy["egress_token"]) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
             if (model.message.isNotBlank()) Text(model.message)
             Button(onClick = model::save, enabled = model.domain.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                Text("保存")
+                Text(Copy["save"])
             }
         }
     }

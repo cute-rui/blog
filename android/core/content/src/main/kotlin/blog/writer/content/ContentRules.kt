@@ -1,4 +1,5 @@
 package blog.writer.content
+import blog.writer.copy.Copy
 
 enum class IssueSeverity { Fail, Warn, Note }
 
@@ -29,18 +30,18 @@ object ContentRules {
         val issues = mutableListOf<ContentIssue>()
         val matter = document.frontMatter
         if (matter.title.isBlank()) {
-            issues += ContentIssue("title", "标题还空着", IssueSeverity.Fail)
+            issues += ContentIssue("title", Copy["issue_title_empty"], IssueSeverity.Fail)
         }
         if (matter.description.isBlank()) {
-            issues += ContentIssue("description", "描述还空着", IssueSeverity.Fail)
+            issues += ContentIssue("description", Copy["issue_description_empty"], IssueSeverity.Fail)
         }
         if (matter.pubDate.isNotBlank() && !DATE.matches(matter.pubDate)) {
-            issues += ContentIssue("pubDate", "发布日期要用 YYYY-MM-DD", IssueSeverity.Fail)
+            issues += ContentIssue("pubDate", Copy["issue_pub_date"], IssueSeverity.Fail)
         }
         if (!selection.blog && selection.wechat) {
             issues += ContentIssue(
                 "source-url",
-                "不发博客，「阅读原文」链接将为空",
+                Copy["issue_source_url"],
                 IssueSeverity.Note,
             )
         }
@@ -49,39 +50,39 @@ object ContentRules {
             if (charCount(title) > WECHAT_TITLE_LIMIT && matter.wechat.title.isNullOrBlank()) {
                 issues += ContentIssue(
                     "wechat-title",
-                    "公众号标题超过 $WECHAT_TITLE_LIMIT 字，需要另填公众号标题",
+                    Copy.format("issue_wechat_title_needs_override", "limit" to WECHAT_TITLE_LIMIT),
                     IssueSeverity.Fail,
                 )
             } else if (charCount(title) > WECHAT_TITLE_LIMIT) {
                 issues += ContentIssue(
                     "wechat-title",
-                    "公众号标题超过 $WECHAT_TITLE_LIMIT 字",
+                    Copy.format("issue_wechat_title_long", "limit" to WECHAT_TITLE_LIMIT),
                     IssueSeverity.Fail,
                 )
             }
             val author = matter.wechat.author
             if (author != null && charCount(author) > WECHAT_AUTHOR_LIMIT) {
-                issues += ContentIssue("wechat-author", "公众号作者超过 $WECHAT_AUTHOR_LIMIT 字", IssueSeverity.Fail)
+                issues += ContentIssue("wechat-author", Copy.format("issue_wechat_author", "limit" to WECHAT_AUTHOR_LIMIT), IssueSeverity.Fail)
             }
             if (charCount(matter.wechatDigest()) > WECHAT_DIGEST_LIMIT) {
-                issues += ContentIssue("wechat-digest", "摘要超过 $WECHAT_DIGEST_LIMIT 字", IssueSeverity.Fail)
+                issues += ContentIssue("wechat-digest", Copy.format("issue_wechat_digest", "limit" to WECHAT_DIGEST_LIMIT), IssueSeverity.Fail)
             }
             if (!document.markdownFile) {
-                issues += ContentIssue("mdx", "发公众号的文章必须是 Markdown，不能是 MDX", IssueSeverity.Fail)
+                issues += ContentIssue("mdx", Copy["issue_mdx"], IssueSeverity.Fail)
             }
             if (matter.heroImage.isNullOrBlank() && matter.wechat.cover.isNullOrBlank()) {
-                issues += ContentIssue("cover", "还没有封面图", IssueSeverity.Warn)
+                issues += ContentIssue("cover", Copy["issue_cover"], IssueSeverity.Warn)
             }
             if (!rendererBound || rendered == null) {
                 issues += ContentIssue(
                     "md2wx",
-                    "还不能用渲染结果检查 2 万字上限（md2wx 未绑定）",
+                    Copy["issue_md2wx_unbound"],
                     IssueSeverity.Warn,
                 )
             } else if (rendered.characters >= WECHAT_HTML_CHAR_LIMIT || rendered.bytes >= WECHAT_HTML_BYTE_LIMIT) {
                 issues += ContentIssue(
                     "html-length",
-                    "公众号 HTML 超过上限（${rendered.characters} 字符）",
+                    Copy.format("issue_html_length", "count" to rendered.characters),
                     IssueSeverity.Fail,
                 )
             }
@@ -93,8 +94,8 @@ object ContentRules {
 }
 
 fun publishButtonLabel(blog: Boolean, wechat: Boolean): String = when {
-    blog && wechat -> "发布到博客，并生成公众号版本"
-    blog -> "发布到博客"
-    wechat -> "生成公众号版本"
-    else -> "只保存，不发布"
+    blog && wechat -> Copy["publish_blog_and_wechat"]
+    blog -> Copy["publish_blog"]
+    wechat -> Copy["publish_wechat"]
+    else -> Copy["publish_save_only"]
 }

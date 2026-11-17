@@ -1,4 +1,5 @@
 package blog.writer.editor
+import blog.writer.copy.Copy
 
 object MarkdownEdit {
     fun wrapSelection(text: String, start: Int, end: Int, marker: String): Edit {
@@ -20,7 +21,7 @@ object MarkdownEdit {
     fun insertLink(text: String, start: Int, end: Int): Edit {
         val safeStart = start.coerceIn(0, text.length)
         val safeEnd = end.coerceIn(safeStart, text.length)
-        val label = text.substring(safeStart, safeEnd).ifBlank { "链接文字" }
+        val label = text.substring(safeStart, safeEnd).ifBlank { Copy["link_text"] }
         val snippet = "[$label](https://)"
         val next = text.substring(0, safeStart) + snippet + text.substring(safeEnd)
         return Edit(next, safeStart + snippet.length)

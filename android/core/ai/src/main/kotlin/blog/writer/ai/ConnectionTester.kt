@@ -1,4 +1,5 @@
 package blog.writer.ai
+import blog.writer.copy.Copy
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -89,7 +90,7 @@ class ConnectionTester {
             modelMismatch = model != null && expectedModel.isNotBlank() && model != expectedModel,
             streamVerified = expectStream && firstMs != null,
             jsonVerified = jsonOk,
-            explanation = if (jsonOk) null else "返回的内容不是 JSON",
+            explanation = if (jsonOk) null else Copy["not_json"],
             rawError = if (jsonOk) null else text.toString(),
             kind = null,
         )
