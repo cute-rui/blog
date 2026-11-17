@@ -29,10 +29,20 @@ object MarkdownEdit {
 
     fun insertImage(text: String, cursor: Int, relativePath: String): Edit {
         val at = cursor.coerceIn(0, text.length)
-        val snippet = "\n\n![]($relativePath)\n"
+        val snippet = "\n\n![${Copy["image"]}]($relativePath)\n"
         val next = text.substring(0, at) + snippet + text.substring(at)
         return Edit(next, at + snippet.length)
     }
 
     data class Edit(val text: String, val cursor: Int)
+}
+
+object MarkdownImages {
+    private val pattern = Regex("""!\[[^\]]*]\(([^)\s]+)\)""")
+
+    fun localDestinations(markdown: String): List<String> =
+        pattern.findAll(markdown).map { it.groupValues[1].trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("http://") && !it.startsWith("https://") }
+            .distinct()
+            .toList()
 }

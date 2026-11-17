@@ -15,6 +15,8 @@ import blog.writer.render.Md2wxWechatMarkdownRenderer
 import blog.writer.render.WechatMarkdownRenderer
 import blog.writer.search.ReachabilityProbe
 import blog.writer.search.SearchRouter
+import blog.writer.images.BesidePostImageHost
+import blog.writer.images.ImageHost
 import blog.writer.sync.SyncEngine
 import dagger.Module
 import dagger.Provides
@@ -70,6 +72,13 @@ object AppModule {
     @Provides
     @Singleton
     fun syncEngine(): SyncEngine = SyncEngine()
+
+    @Provides
+    @Singleton
+    fun imageHost(files: LocalContentStore): ImageHost = BesidePostImageHost(
+        exists = { path -> files.readBytes(path) != null },
+        write = { path, bytes -> files.writeBytes(path, bytes) },
+    )
 
     @Provides
     @Singleton

@@ -57,6 +57,13 @@ class EditorTest {
     }
 
     @Test
+    fun imageShortcutInsertsALocalMarkdownImage() {
+        val edit = MarkdownEdit.insertImage("正文", 2, "./dot.png")
+        assertEquals("正文\n\n![图片](./dot.png)\n", edit.text)
+        assertEquals(listOf("./dot.png"), MarkdownImages.localDestinations(edit.text + "\n![外](https://example.com/a.png)"))
+    }
+
+    @Test
     fun shortcutWrapsTheSelection() {
         val edit = MarkdownEdit.wrapSelection("你好", 0, 2, "**")
         assertEquals("**你好**", edit.text)
