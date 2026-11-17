@@ -2,25 +2,19 @@
 import { siteConfig } from '../site.config';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHeader from '../components/PageHeader.astro';
-import Seal from '../components/Seal.astro';
+import Logo from '../components/Logo.astro';
 ---
 
-<BaseLayout title="关于" description={`${siteConfig.author} 的博客介绍`}>
+<BaseLayout title="关于" description="异位面奥斯蒂亚理工学校学生">
   <PageHeader kicker="About" title="关于" />
   <div class="mt-8 flex items-center gap-5">
-    <Seal size={64} />
+    <Logo size={64} />
     <div>
       <p class="font-serif text-2xl font-semibold tracking-tight">{siteConfig.author}</p>
-      <p class="mt-1 text-muted">{siteConfig.bio}</p>
+      <p class="mt-1 text-muted">异位面奥斯蒂亚理工学校学生</p>
     </div>
   </div>
   <div class="prose mt-10">
-    <p>
-      这里是 {siteConfig.author} 的个人博客，用来写下技术笔记和生活里值得留下的事。
-    </p>
-    <p>
-      站点用 Astro 7 和 Tailwind CSS v4 做成纯静态页面。文章不放在框架仓库里，而是单独放在内容仓库中，两边可以各自更新。
-    </p>
-    <p>要改这段介绍，请编辑 <code>src/pages/about.astro</code>；名字、简介和印章文字在 <code>src/site.config.ts</code>。</p>
+    <p>还没想好写什么，以后想到了再写</p>
   </div>
 </BaseLayout>

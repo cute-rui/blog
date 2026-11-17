@@ -8,7 +8,8 @@ option java_multiple_files = true;
 
 // WechatEgress is the fixed-IP front for the draft APIs.
 // The server calls api.weixin.qq.com. Callers send a bearer token and never
-// send AppID or AppSecret.
+// send AppID or AppSecret. ListDrafts and ListPublished only read. This
+// service does not publish, mass-send, or call freepublish/submit.
 service WechatEgress {
   rpc GetStableToken(GetStableTokenRequest) returns (GetStableTokenResponse);
   rpc UploadImage(UploadImageRequest) returns (UploadImageResponse);
@@ -19,6 +20,10 @@ service WechatEgress {
   rpc UploadCover(UploadCoverRequest) returns (UploadCoverResponse);
   rpc AddDraft(AddDraftRequest) returns (AddDraftResponse);
   rpc UpdateDraft(UpdateDraftRequest) returns (UpdateDraftResponse);
+  // ListDrafts reads draft/batchget. It does not create or send a draft.
+  rpc ListDrafts(ListDraftsRequest) returns (ListDraftsResponse);
+  // ListPublished reads freepublish/batchget. It does not call freepublish/submit.
+  rpc ListPublished(ListPublishedRequest) returns (ListPublishedResponse);
 }
 
 message GetStableTokenRequest {}
@@ -84,3 +89,24 @@ message UpdateDraftRequest {
 }
 
 message UpdateDraftResponse {}
+
+message ListDraftsRequest {}
+
+message ListPublishedRequest {}
+
+// ListedArticle is one news item already in the draft box or already published.
+// content is intentionally absent: callers match on title and content_source_url.
+message ListedArticle {
+  string title = 1;
+  string content_source_url = 2;
+  string media_id = 3;
+  string article_id = 4;
+}
+
+message ListDraftsResponse {
+  repeated ListedArticle articles = 1;
+}
+
+message ListPublishedResponse {
+  repeated ListedArticle articles = 1;
+}

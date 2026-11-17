@@ -24,13 +24,13 @@
 
 front matter 以 [schema/content-schema.json](schema/content-schema.json) 为准。在原有字段上增加了 `publish` 和 `wechat`。`publish` 整块不写时等于只发博客、不发生成公众号版本。`publish.blog: false` 的文章不进网站。`draft: true` 时两个目标都不发。发给公众号的文章必须是 `.md`。
 
-这个框架仓库的 `.gitignore` 忽略整个 `content/`。本仓库里没有文章，也不为内容仓库发明远程地址。内容仓库的目录、`notify.yml` 和 schema 的抄写说明在 [templates/blog-content/README.md](templates/blog-content/README.md)。
+这个框架仓库的 `.gitignore` 忽略整个 `content/`。文章在公开仓库 [cute-rui/blog-source](https://github.com/cute-rui/blog-source) 的 `posts/` 里，目录约定仍是 [templates/blog-content/README.md](templates/blog-content/README.md)。
 
 ## 改站点信息
 
-编辑 `src/site.config.ts` 里的 `title`、`author`、`url` 和 `nav`。`url` 现在仍是 `https://example.com`。你部署之后再改成真实域名。
+编辑 `src/site.config.ts` 里的 `title`、`author`、`url` 和 `nav`。`author` 是 `lightwing`。`url` 现在仍是 `https://example.com`。你部署之后再改成真实域名。
 
-另外三个字段控制侧栏和品牌标识。`bio` 是侧栏作者卡片和关于页里的一句话简介。`seal` 是印章里的那个字，页头、侧栏、页脚、404 页和网站图标（`src/pages/favicon.svg.ts`）都用它。`nav` 里现在多了 `/archive/`，对应按年份归档的页面 `src/pages/archive.astro`。
+站点标志是 [`public/logo.jpg`](public/logo.jpg)。页头、侧栏、页脚、首页和关于页用它，标签图标也指向它。`bio` 只出现在侧栏作者卡片。关于页的标语和正文写在 `src/pages/about.astro`。`seal` 只留给 [`src/pages/favicon.svg.ts`](src/pages/favicon.svg.ts) 那张备用图标。404 页的「迷」不读这个字段。`nav` 里有 `/archive/`，对应 `src/pages/archive.astro`。
 
 ## 页面布局
 
@@ -50,7 +50,9 @@ front matter 以 [schema/content-schema.json](schema/content-schema.json) 为准
 
 `pnpm build` 会先编译 `md2wx`，再校验 `content/posts`，然后把静态站点写到 `dist/`。内容仓库还没检出时，`content/posts` 为空，站点仍然能构建。构建机上要同时有框架仓库和内容仓库，内容放在 `./content`。
 
-GitHub Actions 在 [.github/workflows/publish.yml](.github/workflows/publish.yml)。内容仓库 push 到 `main` 之后，用 GitHub App 安装令牌发 `repository_dispatch`。workflow 模板在 [templates/blog-content/.github/workflows/notify.yml](templates/blog-content/.github/workflows/notify.yml)，复制到内容仓库后再启用。没有 `CLOUDFLARE_API_TOKEN` 时，workflow 会在 summary 里说明并跳过 `wrangler pages deploy`。
+GitHub Actions 在 [.github/workflows/publish.yml](.github/workflows/publish.yml)。它检出 [cute-rui/blog-source](https://github.com/cute-rui/blog-source)。那个仓库 push 到 `main` 之后，可以按 [templates/blog-content/.github/workflows/notify.yml](templates/blog-content/.github/workflows/notify.yml) 用 GitHub App 安装令牌发 `repository_dispatch`。没有 `CLOUDFLARE_API_TOKEN` 时，workflow 会在 summary 里说明并跳过 `wrangler pages deploy`。
+
+同一次运行会编译 `wechat-egress` 客户端，向固定 IP 上的 gRPC 服务查询草稿箱和已发布列表，只把两边都没有的公众号文章放进草稿箱。Actions 不调用微信接口，不群发，也不发表。AppID 和 AppSecret 只在 VPS 的 TOML 里。没有 `WECHAT_EGRESS_TOKEN` 和 `WECHAT_EGRESS_SRV_HOST` 时，只要有公众号文章，同步这一步就失败；网站部署已经在它之前完成。
 
 ## 公众号复制页
 

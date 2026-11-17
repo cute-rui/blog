@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { siteConfig } from '../site.config';
 
-// Same seal mark as the header, so the tab icon follows siteConfig.seal.
+// The tab icon is /logo.jpg. This route keeps the seal character for anyone who requests it.
 export const GET: APIRoute = () => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <g transform="rotate(-4 32 32)">

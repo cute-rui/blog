@@ -1,12 +1,14 @@
-// Package wechat calls the draft APIs on api.weixin.qq.com.
+// Package wechat calls a fixed set of draft APIs on api.weixin.qq.com.
 // It is not a general HTTP proxy: every request uses a fixed path on the
 // configured origin, and that origin is either the official host or a
-// loopback address used by tests.
+// loopback address used by tests. It does not call freepublish/submit or
+// the mass-send APIs. The official host always verifies TLS certificates.
 package wechat
 
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,14 +24,18 @@ import (
 )
 
 const (
-	officialHost    = "api.weixin.qq.com"
-	pathStableToken = "/cgi-bin/stable_token"
-	pathUploadImage = "/cgi-bin/media/uploadimg"
-	pathAddMaterial = "/cgi-bin/material/add_material"
-	pathDraftAdd    = "/cgi-bin/draft/add"
-	pathDraftUpdate = "/cgi-bin/draft/update"
-	coverType       = "image"
-	maxBody         = 1 << 20
+	officialHost        = "api.weixin.qq.com"
+	pathStableToken     = "/cgi-bin/stable_token"
+	pathUploadImage     = "/cgi-bin/media/uploadimg"
+	pathAddMaterial     = "/cgi-bin/material/add_material"
+	pathDraftAdd        = "/cgi-bin/draft/add"
+	pathDraftUpdate     = "/cgi-bin/draft/update"
+	pathDraftBatchGet   = "/cgi-bin/draft/batchget"
+	pathPublishBatchGet = "/cgi-bin/freepublish/batchget"
+	coverType           = "image"
+	maxBody             = 1 << 20
+	batchPageSize       = 20
+	maxListedArticles   = 2000
 )
 
 // Invalid is a caller error. The gRPC server maps it to InvalidArgument.
@@ -100,6 +106,9 @@ func New(cfg Config) (*API, error) {
 		copied := *client
 		copied.CheckRedirect = refuseRedirect
 		client = &copied
+	}
+	if err := rejectInsecureSkip(base, client); err != nil {
+		return nil, err
 	}
 	if client.Timeout == 0 {
 		client.Timeout = 40 * time.Second
@@ -174,11 +183,36 @@ func isLoopback(host string) bool {
 func defaultHTTP() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
+	transport.TLSClientConfig = &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: false,
+	}
 	return &http.Client{
 		Timeout:       40 * time.Second,
 		Transport:     transport,
 		CheckRedirect: refuseRedirect,
 	}
+}
+
+// rejectInsecureSkip refuses a client that disables certificate checks when
+// the origin is the real WeChat host. Loopback bases may skip verification
+// so a local HTTPS stub can run without a private CA.
+func rejectInsecureSkip(base *url.URL, client *http.Client) error {
+	if client == nil || !transportSkipsVerify(client.Transport) {
+		return nil
+	}
+	if isLoopback(base.Hostname()) {
+		return nil
+	}
+	return fmt.Errorf("TLS certificate verification cannot be disabled for %s", base.Hostname())
+}
+
+func transportSkipsVerify(rt http.RoundTripper) bool {
+	transport, ok := rt.(*http.Transport)
+	if !ok || transport == nil || transport.TLSClientConfig == nil {
+		return false
+	}
+	return transport.TLSClientConfig.InsecureSkipVerify
 }
 
 func refuseRedirect(*http.Request, []*http.Request) error {
@@ -322,6 +356,83 @@ func (a *API) UpdateDraft(ctx context.Context, mediaID string, index int, articl
 	})
 }
 
+// ListedArticle is one news item already stored by WeChat. Content is not downloaded.
+type ListedArticle struct {
+	Title            string
+	ContentSourceURL string
+	MediaID          string
+	ArticleID        string
+}
+
+// ListDrafts reads every draft via draft/batchget. It does not add or send.
+func (a *API) ListDrafts(ctx context.Context) ([]ListedArticle, error) {
+	return a.listArticles(ctx, "draft/batchget", pathDraftBatchGet, false)
+}
+
+// ListPublished reads freepublish/batchget. It does not call freepublish/submit.
+func (a *API) ListPublished(ctx context.Context) ([]ListedArticle, error) {
+	return a.listArticles(ctx, "freepublish/batchget", pathPublishBatchGet, true)
+}
+
+func (a *API) listArticles(ctx context.Context, op, path string, published bool) ([]ListedArticle, error) {
+	var out []ListedArticle
+	offset := 0
+	for {
+		var env envelope
+		err := a.withToken(ctx, func(token string) error {
+			got, err := a.postJSON(ctx, op, path, token, batchRequest{
+				Offset:    offset,
+				Count:     batchPageSize,
+				NoContent: 1,
+			})
+			if err != nil {
+				return err
+			}
+			env = got
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(env.Item) > batchPageSize {
+			return nil, &CallError{Op: op, Kind: "wechat", ErrMsg: "batch page was larger than requested"}
+		}
+		for _, item := range env.Item {
+			for _, news := range item.Content.NewsItem {
+				listed := ListedArticle{
+					Title:            strings.TrimSpace(news.Title),
+					ContentSourceURL: strings.TrimSpace(news.ContentSourceURL),
+				}
+				if published {
+					listed.ArticleID = item.ArticleID
+				} else {
+					listed.MediaID = item.MediaID
+				}
+				out = append(out, listed)
+			}
+		}
+		got := len(env.Item)
+		if got == 0 {
+			break
+		}
+		step := env.ItemCount
+		if step <= 0 {
+			step = got
+		}
+		offset += step
+		if env.TotalCount > 0 && offset >= env.TotalCount {
+			break
+		}
+		if env.TotalCount <= 0 && got < batchPageSize {
+			break
+		}
+		if offset > maxListedArticles || len(out) > maxListedArticles {
+			return nil, &CallError{Op: op, Kind: "wechat", ErrMsg: "too many articles to compare safely"}
+		}
+	}
+	return out, nil
+}
+
 func (a *API) withToken(ctx context.Context, fn func(token string) error) error {
 	token, _, err := a.StableToken(ctx)
 	if err != nil {
@@ -366,13 +477,35 @@ type updateRequest struct {
 	Articles Article `json:"articles"`
 }
 
+type batchRequest struct {
+	Offset    int `json:"offset"`
+	Count     int `json:"count"`
+	NoContent int `json:"no_content"`
+}
+
+type batchNews struct {
+	Title            string `json:"title"`
+	ContentSourceURL string `json:"content_source_url"`
+}
+
+type batchEntry struct {
+	MediaID   string `json:"media_id"`
+	ArticleID string `json:"article_id"`
+	Content   struct {
+		NewsItem []batchNews `json:"news_item"`
+	} `json:"content"`
+}
+
 type envelope struct {
-	ErrCode     *int   `json:"errcode"`
-	ErrMsg      string `json:"errmsg"`
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
-	URL         string `json:"url"`
-	MediaID     string `json:"media_id"`
+	ErrCode     *int         `json:"errcode"`
+	ErrMsg      string       `json:"errmsg"`
+	AccessToken string       `json:"access_token"`
+	ExpiresIn   int          `json:"expires_in"`
+	URL         string       `json:"url"`
+	MediaID     string       `json:"media_id"`
+	TotalCount  int          `json:"total_count"`
+	ItemCount   int          `json:"item_count"`
+	Item        []batchEntry `json:"item"`
 }
 
 func (a *API) postJSON(ctx context.Context, op, path, token string, body any) (envelope, error) {

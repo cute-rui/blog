@@ -116,6 +116,67 @@ func TestWorkflowCommandOnLoopback(t *testing.T) {
 	}
 }
 
+func TestListCommandsDoNotPublish(t *testing.T) {
+	var paths []string
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if strings.Contains(r.URL.Path, "submit") || strings.Contains(r.URL.Path, "mass") {
+			t.Errorf("forbidden path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/cgi-bin/stable_token":
+			_, _ = w.Write([]byte(`{"access_token":"access-token-value","expires_in":7200}`))
+		case "/cgi-bin/draft/batchget":
+			_, _ = w.Write([]byte(`{"total_count":1,"item_count":1,"item":[{"media_id":"draft-1","content":{"news_item":[{"title":"草稿","content_source_url":"https://example.com/posts/a/"}]}}]}`))
+		case "/cgi-bin/freepublish/batchget":
+			_, _ = w.Write([]byte(`{"total_count":1,"item_count":1,"item":[{"article_id":"pub-1","content":{"news_item":[{"title":"已发表"}]}}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer fake.Close()
+	srv, err := egress.NewServer(egress.ServerConfig{
+		AppID:    "wx-server",
+		Secret:   "server-secret-value",
+		Token:    "test-bearer-token",
+		APIBase:  fake.URL,
+		Insecure: true,
+		HTTP:     fake.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = srv.Serve(ctx, lis) }()
+	env := map[string]string{
+		"WECHAT_EGRESS_TOKEN":    "test-bearer-token",
+		"WECHAT_EGRESS_ADDRESS":  lis.Addr().String(),
+		"WECHAT_EGRESS_INSECURE": "1",
+	}
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"list-drafts", "--timeout", "5s"}, mapEnv(env), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "草稿") || strings.Contains(stdout.String(), "access-token-value") {
+		t.Fatalf("drafts code %d\n%s\n%s", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = Run([]string{"list-published", "--timeout", "5s"}, mapEnv(env), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "pub-1") || !strings.Contains(stdout.String(), "已发表") {
+		t.Fatalf("published code %d\n%s\n%s", code, stdout.String(), stderr.String())
+	}
+	for _, path := range paths {
+		if strings.Contains(path, "submit") || strings.Contains(path, "mass") || strings.Contains(path, "/draft/add") {
+			t.Fatalf("list called %s", path)
+		}
+	}
+}
+
 func TestServerRejectsPublicInsecureListen(t *testing.T) {
 	path := writeServerConfig(t, `
 app_id = "wx-server"

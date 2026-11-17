@@ -170,6 +170,34 @@ func (c *Client) UpdateDraft(ctx context.Context, mediaID string, index uint32, 
 	})
 }
 
+// ListDrafts returns news items already in the draft box.
+func (c *Client) ListDrafts(ctx context.Context) ([]*pb.ListedArticle, error) {
+	var out *pb.ListDraftsResponse
+	err := c.call(ctx, func(ctx context.Context, api pb.WechatEgressClient) error {
+		resp, err := api.ListDrafts(ctx, &pb.ListDraftsRequest{})
+		out = resp
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.GetArticles(), nil
+}
+
+// ListPublished returns news items already published. It does not publish.
+func (c *Client) ListPublished(ctx context.Context) ([]*pb.ListedArticle, error) {
+	var out *pb.ListPublishedResponse
+	err := c.call(ctx, func(ctx context.Context, api pb.WechatEgressClient) error {
+		resp, err := api.ListPublished(ctx, &pb.ListPublishedRequest{})
+		out = resp
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.GetArticles(), nil
+}
+
 func (c *Client) call(ctx context.Context, fn func(context.Context, pb.WechatEgressClient) error) error {
 	if len(c.endpoints) == 0 {
 		return errors.New("no SRV targets")
@@ -228,7 +256,18 @@ func (c *Client) transport(host string) (credentials.TransportCredentials, error
 		}
 		return insecure.NewCredentials(), nil
 	}
-	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	tlsCfg, err := c.tlsConfig(host)
+	if err != nil {
+		return nil, err
+	}
+	return credentials.NewTLS(tlsCfg), nil
+}
+
+func (c *Client) tlsConfig(host string) (*tls.Config, error) {
+	tlsCfg := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: false,
+	}
 	if c.serverName != "" {
 		tlsCfg.ServerName = c.serverName
 	} else {
@@ -245,7 +284,7 @@ func (c *Client) transport(host string) (credentials.TransportCredentials, error
 		}
 		tlsCfg.RootCAs = pool
 	}
-	return credentials.NewTLS(tlsCfg), nil
+	return tlsCfg, nil
 }
 
 type bearerCreds struct {

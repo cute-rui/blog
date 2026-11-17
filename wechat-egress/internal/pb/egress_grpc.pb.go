@@ -24,6 +24,8 @@ const (
 	WechatEgress_UploadCover_FullMethodName    = "/blog.wechat.egress.v1.WechatEgress/UploadCover"
 	WechatEgress_AddDraft_FullMethodName       = "/blog.wechat.egress.v1.WechatEgress/AddDraft"
 	WechatEgress_UpdateDraft_FullMethodName    = "/blog.wechat.egress.v1.WechatEgress/UpdateDraft"
+	WechatEgress_ListDrafts_FullMethodName     = "/blog.wechat.egress.v1.WechatEgress/ListDrafts"
+	WechatEgress_ListPublished_FullMethodName  = "/blog.wechat.egress.v1.WechatEgress/ListPublished"
 )
 
 // WechatEgressClient is the client API for WechatEgress service.
@@ -32,7 +34,8 @@ const (
 //
 // WechatEgress is the fixed-IP front for the draft APIs.
 // The server calls api.weixin.qq.com. Callers send a bearer token and never
-// send AppID or AppSecret.
+// send AppID or AppSecret. ListDrafts and ListPublished only read. This
+// service does not publish, mass-send, or call freepublish/submit.
 type WechatEgressClient interface {
 	GetStableToken(ctx context.Context, in *GetStableTokenRequest, opts ...grpc.CallOption) (*GetStableTokenResponse, error)
 	UploadImage(ctx context.Context, in *UploadImageRequest, opts ...grpc.CallOption) (*UploadImageResponse, error)
@@ -43,6 +46,10 @@ type WechatEgressClient interface {
 	UploadCover(ctx context.Context, in *UploadCoverRequest, opts ...grpc.CallOption) (*UploadCoverResponse, error)
 	AddDraft(ctx context.Context, in *AddDraftRequest, opts ...grpc.CallOption) (*AddDraftResponse, error)
 	UpdateDraft(ctx context.Context, in *UpdateDraftRequest, opts ...grpc.CallOption) (*UpdateDraftResponse, error)
+	// ListDrafts reads draft/batchget. It does not create or send a draft.
+	ListDrafts(ctx context.Context, in *ListDraftsRequest, opts ...grpc.CallOption) (*ListDraftsResponse, error)
+	// ListPublished reads freepublish/batchget. It does not call freepublish/submit.
+	ListPublished(ctx context.Context, in *ListPublishedRequest, opts ...grpc.CallOption) (*ListPublishedResponse, error)
 }
 
 type wechatEgressClient struct {
@@ -103,13 +110,34 @@ func (c *wechatEgressClient) UpdateDraft(ctx context.Context, in *UpdateDraftReq
 	return out, nil
 }
 
+func (c *wechatEgressClient) ListDrafts(ctx context.Context, in *ListDraftsRequest, opts ...grpc.CallOption) (*ListDraftsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDraftsResponse)
+	err := c.cc.Invoke(ctx, WechatEgress_ListDrafts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *wechatEgressClient) ListPublished(ctx context.Context, in *ListPublishedRequest, opts ...grpc.CallOption) (*ListPublishedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPublishedResponse)
+	err := c.cc.Invoke(ctx, WechatEgress_ListPublished_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WechatEgressServer is the server API for WechatEgress service.
 // All implementations must embed UnimplementedWechatEgressServer
 // for forward compatibility.
 //
 // WechatEgress is the fixed-IP front for the draft APIs.
 // The server calls api.weixin.qq.com. Callers send a bearer token and never
-// send AppID or AppSecret.
+// send AppID or AppSecret. ListDrafts and ListPublished only read. This
+// service does not publish, mass-send, or call freepublish/submit.
 type WechatEgressServer interface {
 	GetStableToken(context.Context, *GetStableTokenRequest) (*GetStableTokenResponse, error)
 	UploadImage(context.Context, *UploadImageRequest) (*UploadImageResponse, error)
@@ -120,6 +148,10 @@ type WechatEgressServer interface {
 	UploadCover(context.Context, *UploadCoverRequest) (*UploadCoverResponse, error)
 	AddDraft(context.Context, *AddDraftRequest) (*AddDraftResponse, error)
 	UpdateDraft(context.Context, *UpdateDraftRequest) (*UpdateDraftResponse, error)
+	// ListDrafts reads draft/batchget. It does not create or send a draft.
+	ListDrafts(context.Context, *ListDraftsRequest) (*ListDraftsResponse, error)
+	// ListPublished reads freepublish/batchget. It does not call freepublish/submit.
+	ListPublished(context.Context, *ListPublishedRequest) (*ListPublishedResponse, error)
 	mustEmbedUnimplementedWechatEgressServer()
 }
 
@@ -144,6 +176,12 @@ func (UnimplementedWechatEgressServer) AddDraft(context.Context, *AddDraftReques
 }
 func (UnimplementedWechatEgressServer) UpdateDraft(context.Context, *UpdateDraftRequest) (*UpdateDraftResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateDraft not implemented")
+}
+func (UnimplementedWechatEgressServer) ListDrafts(context.Context, *ListDraftsRequest) (*ListDraftsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListDrafts not implemented")
+}
+func (UnimplementedWechatEgressServer) ListPublished(context.Context, *ListPublishedRequest) (*ListPublishedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListPublished not implemented")
 }
 func (UnimplementedWechatEgressServer) mustEmbedUnimplementedWechatEgressServer() {}
 func (UnimplementedWechatEgressServer) testEmbeddedByValue()                      {}
@@ -256,6 +294,42 @@ func _WechatEgress_UpdateDraft_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WechatEgress_ListDrafts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDraftsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WechatEgressServer).ListDrafts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WechatEgress_ListDrafts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WechatEgressServer).ListDrafts(ctx, req.(*ListDraftsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WechatEgress_ListPublished_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPublishedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WechatEgressServer).ListPublished(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WechatEgress_ListPublished_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WechatEgressServer).ListPublished(ctx, req.(*ListPublishedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WechatEgress_ServiceDesc is the grpc.ServiceDesc for WechatEgress service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -282,6 +356,14 @@ var WechatEgress_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateDraft",
 			Handler:    _WechatEgress_UpdateDraft_Handler,
+		},
+		{
+			MethodName: "ListDrafts",
+			Handler:    _WechatEgress_ListDrafts_Handler,
+		},
+		{
+			MethodName: "ListPublished",
+			Handler:    _WechatEgress_ListPublished_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

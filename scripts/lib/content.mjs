@@ -121,6 +121,13 @@ export function schemaErrors(validate, data) {
   return { data: copy, errors };
 }
 
+export function wechatSourceUrl(post, site) {
+  const specified = post.data?.wechat?.sourceUrl;
+  if (typeof specified === 'string' && specified !== '' && specified !== 'auto') return specified;
+  if (post.data?.publish?.blog === false) return '';
+  return `${site.url}/posts/${encodeURIComponent(post.slug)}/`;
+}
+
 export function normalizePublish(data) {
   const publish = data.publish ?? {};
   return {

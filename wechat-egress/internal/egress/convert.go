@@ -56,3 +56,16 @@ func articleFromProto(in *pb.Article) (wechat.Article, error) {
 	}
 	return article, nil
 }
+
+func listedToProto(items []wechat.ListedArticle) []*pb.ListedArticle {
+	out := make([]*pb.ListedArticle, 0, len(items))
+	for _, item := range items {
+		out = append(out, &pb.ListedArticle{
+			Title:            item.Title,
+			ContentSourceUrl: item.ContentSourceURL,
+			MediaId:          item.MediaID,
+			ArticleId:        item.ArticleID,
+		})
+	}
+	return out
+}

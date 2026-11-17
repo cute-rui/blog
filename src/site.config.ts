@@ -7,9 +7,9 @@ export interface SiteConfig {
   title: string;
   description: string;
   author: string;
-  /** One or two sentences shown in the sidebar author card and on the about page. */
+  /** Sidebar author card. The about page does not use this field. */
   bio: string;
-  /** Single character stamped into the seal mark (header, sidebar, footer). */
+  /** Single character for the 404 seal and /favicon.svg. The site logo is public/logo.jpg. */
   seal: string;
   url: string;
   lang: string;
@@ -21,7 +21,7 @@ export interface SiteConfig {
 export const siteConfig: SiteConfig = {
   title: '我的博客',
   description: '记录技术与生活的个人博客。',
-  author: 'Greg',
+  author: 'lightwing',
   bio: '写代码，也写生活。这里记下踩过的坑、做过的取舍，和值得留住的片段。',
   seal: 'G',
   url: 'https://example.com',

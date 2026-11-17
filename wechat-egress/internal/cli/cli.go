@@ -37,7 +37,7 @@ func Run(args []string, getenv func(string) string, stdout, stderr io.Writer) in
 	switch args[0] {
 	case "server":
 		return runServer(args[1:], getenv, stderr)
-	case "stable-token", "upload-image", "upload-cover", "add-draft", "update-draft":
+	case "stable-token", "upload-image", "upload-cover", "add-draft", "update-draft", "list-drafts", "list-published":
 		return runClient(args[0], args[1:], getenv, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n\n%s", args[0], usage)
@@ -60,9 +60,13 @@ Client (in the workflow; picks one):
   wechat-egress upload-cover --file cover.png
   wechat-egress add-draft --file draft.json
   wechat-egress update-draft --file draft.json
+  wechat-egress list-drafts
+  wechat-egress list-published
 
-The client looks up SRV _wechat._tcp.$WECHAT_EGRESS_SRV_HOST unless --address
-host:port is set. --insecure is plaintext and only dials a loopback address.
+list-drafts and list-published only read. The client never publishes and
+never mass-sends. The client looks up SRV _wechat._tcp.$WECHAT_EGRESS_SRV_HOST
+unless --address host:port is set. --insecure is plaintext and only dials a
+loopback address. Certificate verification stays on for every other target.
 
 `
 
@@ -214,10 +218,37 @@ func runClient(cmd string, args []string, getenv func(string) string, stdout, st
 			return 1
 		}
 		return writeJSON(stdout, stderr, map[string]any{"errcode": 0, "errmsg": "ok"})
+	case "list-drafts":
+		articles, err := client.ListDrafts(ctx)
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return writeJSON(stdout, stderr, map[string]any{"articles": listedJSON(articles)})
+	case "list-published":
+		articles, err := client.ListPublished(ctx)
+		if err != nil {
+			fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return writeJSON(stdout, stderr, map[string]any{"articles": listedJSON(articles)})
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n", cmd)
 		return 2
 	}
+}
+
+func listedJSON(articles []*pb.ListedArticle) []map[string]string {
+	out := make([]map[string]string, 0, len(articles))
+	for _, article := range articles {
+		out = append(out, map[string]string{
+			"title":              article.GetTitle(),
+			"content_source_url": article.GetContentSourceUrl(),
+			"media_id":           article.GetMediaId(),
+			"article_id":         article.GetArticleId(),
+		})
+	}
+	return out
 }
 
 func baseName(path string) string {

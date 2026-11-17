@@ -15,7 +15,7 @@ blog-content/
 
 如果还是旧布局 `posts/<slug>.md`，改成 `posts/<slug>/index.md`，并把原来跟文章放在一起的图片移进该目录。博客仓库的校验会拒绝留在 `content/posts/` 根上的单文件。
 
-`notify.yml` 只在 `main` 被 push 时通知 `owner/blog`。内容仓库不要调用微信接口。
+`notify.yml` 只在 `main` 被 push 时通知博客仓库。博客仓库的 workflow 从公开仓库 `https://github.com/cute-rui/blog-source` 检出 `posts/`，所以这份通知要放在那个仓库里，`client_payload.after` 必须是它的提交。内容仓库不要调用微信接口。公众号文章用同一份 `posts/` 和 `publish.wechat`，不另做一套目录。
 
 一次 push 想少发一个目标时，在最后一个 commit 末尾加 trailer，只能收窄，不能把 front matter 里关掉的目标重新打开：
 
