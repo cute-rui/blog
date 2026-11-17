@@ -230,6 +230,7 @@
   "preset_openai": "OpenAI",
   "preset_gemini": "Google Gemini",
   "preset_openrouter": "OpenRouter",
+  "preset_magpie": "Magpie",
   "github_token_note": "令牌只放在这台手机的 Keystore 里。仓库里不会出现 key。",
   "github_owner": "内容仓库所有者",
   "github_repo": "内容仓库名",

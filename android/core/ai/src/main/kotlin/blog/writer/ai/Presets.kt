@@ -70,6 +70,15 @@ object LlmPresets {
         search = false,
         context = 65_536,
     )
+    val magpie = preset(
+        id = "magpie",
+        name = Copy["preset_magpie"],
+        baseUrl = "http://127.0.0.1:3425/v1",
+        model = "deepseek/deepseek-v4-pro",
+        domestic = true,
+        search = false,
+        context = 131_072,
+    )
     val openAi = preset(
         id = "openai",
         name = Copy["preset_openai"],
@@ -120,7 +129,7 @@ object LlmPresets {
         jsonOutput = false,
     )
 
-    val domestic: List<LlmPreset> = listOf(deepSeek, qwen, kimi, glm, doubao, siliconFlow)
+    val domestic: List<LlmPreset> = listOf(deepSeek, qwen, kimi, glm, doubao, siliconFlow, magpie)
     val overseas: List<LlmPreset> = listOf(openAi, anthropic, gemini, openRouter)
     val all: List<LlmPreset> = domestic + overseas + custom
 
