@@ -28,6 +28,7 @@ import blog.writer.ai.FactChecker
 import blog.writer.ai.FillMiddle
 import blog.writer.ai.LlmEndpoint
 import blog.writer.ai.formatSearchResults
+import blog.writer.data.files.LocalContentStore
 import blog.writer.data.repo.AiHistoryRepository
 import blog.writer.data.repo.PostRepository
 import blog.writer.data.repo.LlmRepository
@@ -35,13 +36,20 @@ import blog.writer.data.repo.SearchRepository
 import blog.writer.data.repo.SyncCoordinator
 import blog.writer.data.repo.factSettings
 import blog.writer.search.SearchRouter
+import blog.writer.editor.MarkdownEdit
 import blog.writer.editor.PendingDrafts
 import blog.writer.editor.PendingSpan
+import blog.writer.sync.ImageHost
+import blog.writer.sync.articleCommitPaths
+import blog.writer.sync.imageFileName
+import blog.writer.sync.resolveArticleImage
 import blog.writer.ui.nav.decodePath
 import blog.writer.ui.nav.encodePath
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -90,6 +98,8 @@ class EditorViewModel @Inject constructor(
     private val search: SearchRepository,
     private val history: AiHistoryRepository,
     private val router: SearchRouter,
+    private val images: ImageHost,
+    private val files: LocalContentStore,
 ) : ViewModel() {
     private val handle = savedStateHandle
     private var path: String = decodePath(savedStateHandle.get<String>("path").orEmpty())
@@ -173,6 +183,39 @@ class EditorViewModel @Inject constructor(
         matter = matter.copy(wechat = matter.wechat.copy(digest = next))
         publishUi(savedLabel = Copy["saving"])
         scheduleSave()
+    }
+
+    fun insertImage(bytes: ByteArray, suggestedName: String?, cursor: Int, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            if (bytes.isEmpty()) {
+                onDone(Copy["image_empty"])
+                return@launch
+            }
+            if (imageFileName(suggestedName, bytes) == null) {
+                onDone(Copy["image_type_unsupported"])
+                return@launch
+            }
+            val stored = runCatching {
+                withContext(Dispatchers.IO) { images.upload(path, suggestedName.orEmpty(), bytes) }
+            }
+            val markdownPath = stored.getOrElse {
+                onDone(Copy["image_read_failed"])
+                return@launch
+            }
+            val edit = MarkdownEdit.insertImage(display, cursor, markdownPath)
+            pending = pending?.let { PendingDrafts.adjust(display, edit.text, it) }
+            display = edit.text
+            if (surface == ArticleSurface.Blog) sharedBody = PendingDrafts.acceptedText(display, pending)
+            _commands.tryEmit(TextCommand(edit.text, edit.cursor))
+            publishUi(savedLabel = Copy["saving"])
+            scheduleSave()
+            onDone(Copy["image_inserted"])
+        }
+    }
+
+    fun readImage(reference: String): ByteArray? {
+        val full = resolveArticleImage(path, reference) ?: return null
+        return files.readBytes(full)
     }
 
     fun setWechatCover(value: String) {
@@ -444,7 +487,7 @@ class EditorViewModel @Inject constructor(
                     handle["path"] = encodePath(moved)
                 }
             }
-            val note = sync.sync(selection, setOf(path))
+            val note = sync.sync(selection, articleCommitPaths(path, posts.localFiles().map { it.path }))
             reload()
             onDone(note)
         }

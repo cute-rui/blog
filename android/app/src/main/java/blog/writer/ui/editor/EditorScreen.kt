@@ -1,6 +1,10 @@
 package blog.writer.ui.editor
 import blog.writer.copy.Copy
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -57,6 +61,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
@@ -77,14 +82,17 @@ import blog.writer.content.ContentIssue
 import blog.writer.content.IssueSeverity
 import blog.writer.data.repo.Appearance
 import blog.writer.editor.MarkdownEdit
+import blog.writer.editor.MarkdownImages
 import blog.writer.editor.MarkdownKind
 import blog.writer.editor.MarkdownSyntax
 import blog.writer.ui.theme.EditorText
 import blog.writer.ui.theme.LocalWritingColors
 import blog.writer.ui.theme.Mono
 import blog.writer.ui.theme.SerifSc
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data object AssistKey
 
@@ -103,6 +111,21 @@ fun EditorScreen(
     val state = rememberTextFieldState("")
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val pickImage = rememberLauncherForActivityResult(PickVisualMedia()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val cursor = state.selection.start
+        scope.launch {
+            val picked = withContext(Dispatchers.IO) { readPickedImage(context.contentResolver, uri) }
+            if (picked == null) {
+                snackbar.showSnackbar(Copy["image_read_failed"])
+            } else {
+                model.insertImage(picked.bytes, picked.name, cursor) { message ->
+                    scope.launch { snackbar.showSnackbar(message) }
+                }
+            }
+        }
+    }
     val haptic = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
     var ideas by remember { mutableStateOf(false) }
@@ -216,13 +239,7 @@ fun EditorScreen(
                                 selection = TextRange(edit.cursor)
                             }
                         },
-                        onImage = {
-                            val edit = MarkdownEdit.insertImage(state.text.toString(), state.selection.start, "./")
-                            state.edit {
-                                replace(0, length, edit.text)
-                                selection = TextRange(edit.cursor)
-                            }
-                        },
+                        onImage = { pickImage.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) },
                         onAssist = { menu = true },
                     )
                 }
@@ -274,6 +291,8 @@ fun EditorScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
+                    val pictures = MarkdownImages.localDestinations(ui.body)
+                    if (pictures.isNotEmpty()) ArticleImageStrip(pictures, model::readImage)
                     val colors = MaterialTheme.colorScheme
                     val textStyle = EditorText.body(appearance.fontSizeSp, appearance.serif).copy(color = colors.onSurface)
                     BasicTextField(

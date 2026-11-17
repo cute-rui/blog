@@ -15,6 +15,7 @@ import blog.writer.data.files.LocalContentStore
 import blog.writer.sync.ContentHash
 import blog.writer.sync.ContentPaths
 import blog.writer.sync.GitBlob
+import blog.writer.sync.movedWithArticle
 import blog.writer.sync.LocalSyncFile
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
@@ -110,6 +111,9 @@ class PostRepository @Inject constructor(
         if (!isDraftPath(path)) return path
         val target = postPath(slugOf(path), drafts = false)
         val document = read(path)
+        for ((from, to) in movedWithArticle(path, target, files.listContentFiles())) {
+            if (from != path) files.move(from, to)
+        }
         files.move(path, target)
         write(PostDocument(target, document.frontMatter, document.body), dirty = true)
         dao.pending(path)?.let { dao.upsertPending(it.copy(path = target)); dao.deletePending(path) }

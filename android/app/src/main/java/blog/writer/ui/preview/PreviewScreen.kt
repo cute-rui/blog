@@ -33,6 +33,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import blog.writer.content.slugOf
 import blog.writer.content.wechatBody
+import blog.writer.data.files.LocalContentStore
 import blog.writer.data.repo.GithubSettingsRepository
 import blog.writer.data.repo.PostRepository
 import blog.writer.data.repo.WechatDraftSync
@@ -40,6 +41,10 @@ import blog.writer.egress.EgressException
 import blog.writer.render.WechatMarkdownRenderer
 import blog.writer.render.WechatRenderOptions
 import blog.writer.render.WechatTheme
+import blog.writer.render.blogPreviewHtml
+import blog.writer.render.embedImageSources
+import blog.writer.render.imageDataUri
+import blog.writer.sync.resolveArticleImage
 import blog.writer.sync.CopyDecision
 import blog.writer.sync.WechatCopy
 import blog.writer.ui.nav.decodePath
@@ -61,6 +66,7 @@ class PreviewViewModel @Inject constructor(
     private val renderer: WechatMarkdownRenderer,
     private val http: OkHttpClient,
     private val drafts: WechatDraftSync,
+    private val files: LocalContentStore,
 ) : ViewModel() {
     private val path = decodePath(savedStateHandle.get<String>("path").orEmpty())
     val note = MutableStateFlow(Copy["note_using_md2wx"])
@@ -87,8 +93,15 @@ class PreviewViewModel @Inject constructor(
             }
             rendered.fold(
                 onSuccess = { result ->
+                    val fragment = embedImageSources(
+                        result.htmlFragment,
+                        result.images.map { image ->
+                            val bytes = resolveArticleImage(path, image.path)?.let { files.readBytes(it) }
+                            image.placeholder to (bytes?.let { imageDataUri(image.path, it) } ?: image.placeholder)
+                        },
+                    )
                     val caption = Copy.format("preview_image_count", "count" to result.images.size, "chars" to result.length.characters)
-                    html.value = "<html><body style=\"background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px\">${result.htmlFragment}<p>$caption</p></body></html>"
+                    html.value = "<html><body style=\"background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px\">$fragment<p>$caption</p></body></html>"
                     note.value = Copy["note_wechat"]
                 },
                 onFailure = { error ->
@@ -121,7 +134,10 @@ class PreviewViewModel @Inject constructor(
         viewModelScope.launch {
             mode.value = Copy["blog"]
             val document = posts.read(path)
-            html.value = blogHtml(document.body)
+            html.value = blogPreviewHtml(document.body) { reference ->
+                val bytes = resolveArticleImage(path, reference)?.let { files.readBytes(it) } ?: return@blogPreviewHtml null
+                imageDataUri(reference, bytes)
+            }
             note.value = Copy["note_blog"]
         }
     }
@@ -226,7 +242,7 @@ fun PreviewScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 factory = { context -> WebView(context).apply { settings.javaScriptEnabled = false } },
                 update = { web ->
-                    web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                    web.loadDataWithBaseURL("https://localhost/", html, "text/html", "utf-8", null)
                 },
             )
         }
@@ -244,20 +260,3 @@ private fun draftFailure(error: Throwable): String {
     }
 }
 
-private fun blogHtml(markdown: String): String {
-    val escaped = markdown.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    val blocks = escaped.split("\n\n").joinToString("") { block ->
-        val line = block.trim()
-        when {
-            line.startsWith("# ") -> "<h1>${line.removePrefix("# ")}</h1>"
-            line.startsWith("## ") -> "<h2>${line.removePrefix("## ")}</h2>"
-            line.startsWith("### ") -> "<h3>${line.removePrefix("### ")}</h3>"
-            else -> "<p>${line.replace("\n", "<br>")}</p>"
-        }
-    }
-    return """
-        <html><body style="background:#FAF7F0;color:#1E1C19;font-family:serif;padding:24px;line-height:1.75">
-        $blocks
-        </body></html>
-        """.trimIndent()
-}
